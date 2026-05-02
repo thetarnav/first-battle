@@ -4,6 +4,7 @@ import "core:fmt"
 import "core:math"
 import la "core:math/linalg"
 import k2 "./karl2d"
+import qt "./quadtree"
 
 Vec2  :: k2.Vec2
 Color :: k2.Color
@@ -20,7 +21,7 @@ Army :: struct {
     side:     Army_Side,
     name:     string,
     color:    Color,
-    soldiers: [dynamic]Soldier,
+    soldiers: #soa[dynamic]Soldier,
 }
 
 Soldier :: struct {
@@ -108,22 +109,38 @@ step :: proc () -> bool {
     for army in armies {
         op_army_side := side_opposite(army.side)
         op_army      := armies[op_army_side]
+
+        op_army_points := op_army.soldiers.pos[:len(op_army.soldiers)]
+        op_army_tree   := qt.build(op_army_points, context.temp_allocator)
+
         for &s, i in army.soldiers {
 
             // set target
             if _, has_target := s.target.?; !has_target {
-                s.target = Soldier_Handle{
-                    side = op_army_side,
-                    idx  = 0,
+                p, found := qt.query_nearest(op_army_tree, s.pos)
+                if found {
+                    s.target = Soldier_Handle{
+                        side = op_army_side,
+                        idx  = p.idx,
+                    }
+                } else {
+                    // fmt.println(s, p, found)
                 }
             }
 
             // update pos towards target
-            if target, has_target := s.target.?; has_target {
-                c := la.normalize(s.pos - op_army.soldiers[target.idx].pos)
-                if !math.is_nan(c.x) ||
-                   !math.is_nan(c.y) {
-                    s.pos -= c
+            update: if target, has_target := s.target.?; has_target {
+                d := s.pos - op_army.soldiers[target.idx].pos
+                if d == 0 do break update
+                l := la.length(d)
+                if l == 0 do break update
+                c := d/l
+                n := s.pos - c
+                if !math.is_nan(n.x) &&
+                   !math.is_nan(n.y) &&
+                   !math.is_inf(n.x) &&
+                   !math.is_inf(n.y) {
+                    s.pos = n
                 }
             }
 
@@ -136,6 +153,8 @@ step :: proc () -> bool {
     k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
 
     k2.present()
+
+    free_all(context.temp_allocator)
 
     return true
 }
