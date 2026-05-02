@@ -2,7 +2,6 @@ package first_battle
 
 import "core:math"
 import la "core:math/linalg"
-import "core:fmt"
 import k2 "./karl2d"
 
 Vec2  :: k2.Vec2
@@ -77,7 +76,9 @@ init_armies :: proc () {
 }
 
 init :: proc () {
-    k2.init(1280, 720, "Greetings from Karl2D!")
+    k2.init(1280, 720, "Greetings from Karl2D!", {
+        window_mode = .Windowed_Resizable,
+    })
 
     init_armies()
 }
@@ -91,13 +92,15 @@ step :: proc () -> bool {
  
     k2.update() or_return
 
-    k2.clear(k2.LIGHT_BLUE)
+    k2.clear({12, 10, 9, 255})
 
     k2.draw_text("Hellope!", {50, 50}, 100, k2.DARK_BLUE)
 
-    ws     := k2.get_screen_size()
-    wscale := k2.get_window_scale()
-    wc     := ws/wscale/2
+    ws := k2.get_screen_size()
+    wc := ws/2
+
+    k2.draw_line(wc - {20, 0}, wc + {20, 0}, 3, k2.DARK_GRAY)
+    k2.draw_line(wc - {0, 20}, wc + {0, 20}, 3, k2.DARK_GRAY)
 
     for army in armies {
         op_army_side := side_opposite(army.side)
