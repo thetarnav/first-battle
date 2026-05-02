@@ -1,5 +1,6 @@
 package first_battle
 
+import "core:fmt"
 import "core:math"
 import la "core:math/linalg"
 import k2 "./karl2d"
@@ -92,6 +93,8 @@ step :: proc () -> bool {
  
     k2.update() or_return
 
+    dt := k2.get_frame_time()
+
     k2.clear({12, 10, 9, 255})
 
     k2.draw_text("Hellope!", {50, 50}, 100, k2.DARK_BLUE)
@@ -128,6 +131,9 @@ step :: proc () -> bool {
         }
         // k2.draw_text(army.name, army_pos - {0, 20}, 20, color)
     }
+
+    fps := dt*60*1000
+    k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
 
     k2.present()
 
