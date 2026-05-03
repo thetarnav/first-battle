@@ -121,7 +121,7 @@ step :: proc () -> bool {
     draw_cross(wc, k2.DARK_GRAY)
 
     @static
-    mouse_target: Maybe(Vec)
+    mouse_target: union{vec2, Army_Side}
 
     mouse_pos := k2.get_mouse_position()
     draw_cross(mouse_pos, k2.GREEN)
@@ -129,18 +129,18 @@ step :: proc () -> bool {
     @static
     prev_outlines: [Army_Side]Maybe([]vec2)
 
-    if k2.mouse_button_is_held(.Left) {
-        if outline, ok := prev_outlines[.Enemy].?; ok && point_in_polygon(mouse_pos, outline) {
-            mouse_target = nil
-        } else {
-            mouse_target = mouse_pos
+    check_mouse: if k2.mouse_button_is_held(.Left) {
+        for outline, side in prev_outlines {
+            o := outline.? or_continue
+            if point_in_polygon(mouse_pos, o) {
+                mouse_target = side
+                break check_mouse
+            }
         }
+        mouse_target = mouse_pos
     }
 
-
-    goal: Maybe(vec2)
-    if target, ok := mouse_target.?; ok {
-        goal = target
+    if target, ok := mouse_target.(vec2); ok {
         draw_cross(target, k2.ORANGE)
     }
 
@@ -177,26 +177,41 @@ step :: proc () -> bool {
 
             if s.target.left_steps > 0 do continue
 
-            goal_loc, has_goal := goal.?
+            goal_loc, has_goal := mouse_target.(vec2)
 
-            if army.side == .Player && has_goal {
-                s.target.pos = each_army_goal_pos(goal_loc, i, len(non_dead_soldiers[army.side]))
-                s.target.left_steps = rand.int_range(2, 12)
-            } else {
-                p, found := qt.query_nearest(op_army_tree, s.pos)
-                if found {
-                    s.target.idx        = p.idx
-                    s.target.pos        = p.pos
-                    s.target.left_steps = rand.int_range(2, 12)
-
-                    enemy := &op_army.soldiers[p.idx]
-                    if distance(enemy.pos, s.pos) < 10 {
-                        enemy.in_fight  += 0.8
-                        enemy.dmg_taken += 0.05
-                        s.in_fight      += 1
-                        s.dmg_taken     += 0.04
+            if army.side == .Player {
+                switch t in mouse_target {
+                case nil:
+                    s.target = {}
+                    continue
+                case vec2:
+                    s.target.pos = each_army_goal_pos(t, i, len(non_dead_soldiers[army.side]))
+                    s.target.left_steps = rand.int_range(6, 16)
+                    continue
+                case Army_Side:
+                    if t == army.side {
+                        s.target = {}
                         continue
+                    } else {
+                        break // attack
                     }
+                }
+            }
+
+            // attack
+            p, found := qt.query_nearest(op_army_tree, s.pos)
+            if found {
+                s.target.idx        = p.idx
+                s.target.pos        = p.pos
+                s.target.left_steps = rand.int_range(10, 24)
+
+                enemy := &op_army.soldiers[p.idx]
+                if distance(enemy.pos, s.pos) < 10 {
+                    enemy.in_fight  += 0.8
+                    enemy.dmg_taken += 0.05
+                    s.in_fight      += 1
+                    s.dmg_taken     += 0.04
+                    continue
                 }
             }
         }
