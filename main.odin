@@ -27,8 +27,9 @@ Army :: struct {
 }
 
 Soldier :: struct {
-    pos:    Vec2,
-    target: struct {
+    pos:      Vec2,
+    in_fight: int,
+    target:   struct {
         pos:        Vec,
         left_steps: int,
     }
@@ -144,27 +145,45 @@ step :: proc () -> bool {
         op_army_tree   := qt.build(op_army_points, context.temp_allocator)
 
         for &s, i in army.soldiers {
-
             // set target
             if s.target.left_steps == 0 {
                 if army.side == .Player {
                     s.target.pos = each_army_goal_pos(goal, i, len(army.soldiers))
-                    s.target.left_steps = rand.int_range(1, 10)
+                    s.target.left_steps = rand.int_range(2, 12)
                 } else {
                     p, found := qt.query_nearest(op_army_tree, s.pos)
                     if found {
                         s.target.pos = p.pos
-                        s.target.left_steps = rand.int_range(1, 10)
+                        s.target.left_steps = rand.int_range(2, 12)
+
+                        // in fight if close
+                        if la.distance(p.pos, s.pos) < 20 {
+                            target_s := &op_army.soldiers[p.idx]
+                            target_s.in_fight += 1
+                        }
                     }
                 }
             }
+        }
+        // k2.draw_text(army.name, army_pos - {0, 20}, 20, color)
+    }
 
+    for army in armies {
+        for &s, i in army.soldiers {
             // update pos towards target
             update: if s.target.left_steps != 0 {
                 s.target.left_steps -= 1
                 d := s.pos - s.target.pos
                 if d == 0 do break update
-                n := s.pos - la.normalize(d)
+                d = la.normalize(d)
+
+                // in fight is slower
+                if s.in_fight > 0 {
+                    d /= Vec(s.in_fight+1)
+                    s.in_fight = 0
+                }
+
+                n := s.pos - d
                 if !math.is_nan(n.x) &&
                    !math.is_nan(n.y) &&
                    !math.is_inf(n.x) &&
@@ -175,7 +194,6 @@ step :: proc () -> bool {
 
             k2.draw_circle(s.pos, UNIT_W/2, army.color)
         }
-        // k2.draw_text(army.name, army_pos - {0, 20}, 20, color)
     }
 
     fps := dt*60*1000
