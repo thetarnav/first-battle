@@ -97,6 +97,11 @@ UNIT_W :: 4
 UNIT_M :: 3
 UNIT_S :: UNIT_W + UNIT_M*2
 
+draw_cross :: proc (pos: Vec, color: Color) {
+    k2.draw_line(pos - {20, 0}, pos + {20, 0}, 3, color)
+    k2.draw_line(pos - {0, 20}, pos + {0, 20}, 3, color)
+}
+
 step :: proc () -> bool {
  
     k2.update() or_return
@@ -110,10 +115,23 @@ step :: proc () -> bool {
     ws := k2.get_screen_size()
     wc := ws/2
 
-    goal := Vec2{500, 500}
+    draw_cross(wc, k2.DARK_GRAY)
 
-    k2.draw_line(wc - {20, 0}, wc + {20, 0}, 3, k2.DARK_GRAY)
-    k2.draw_line(wc - {0, 20}, wc + {0, 20}, 3, k2.DARK_GRAY)
+    @static
+    mouse_target: Maybe(Vec)
+
+    mouse_pos := k2.get_mouse_position()
+    draw_cross(mouse_pos, k2.GREEN)
+
+    if k2.mouse_button_is_held(.Left) {
+        mouse_target = mouse_pos
+    }
+
+    goal := Vec2{500, 500}
+    if target, ok := mouse_target.?; ok {
+        goal = target
+    }
+    draw_cross(goal, k2.ORANGE)
 
     for army in armies {
         op_army_side := side_opposite(army.side)
@@ -128,7 +146,7 @@ step :: proc () -> bool {
             if s.target.left_steps == 0 {
                 if army.side == .Player {
                     s.target.pos = goal
-                    s.target.left_steps = -1
+                    s.target.left_steps = rand.int_range(1, 10)
                 } else {
                     p, found := qt.query_nearest(op_army_tree, s.pos)
                     if found {
