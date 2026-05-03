@@ -95,7 +95,7 @@ init_armies :: proc () {
 
 init :: proc () {
     k2.init(1280, 720, "Greetings from Karl2D!", {
-        window_mode = .Windowed_Resizable,
+        // window_mode = .Windowed_Resizable,
     })
 
     init_armies()
@@ -180,7 +180,7 @@ step :: proc () -> bool {
                     s.target.left_steps = rand.int_range(2, 12)
 
                     // in fight if close
-                    if la.distance(p.pos, s.pos) < 10 {
+                    if distance(p.pos, s.pos) < 10 {
                         target_s := &op_army.soldiers[p.idx]
                         target_s.in_fight += 1
                         target_s.dmg_taken += 0.05
@@ -228,6 +228,20 @@ step :: proc () -> bool {
                 color = k2.DARK_GRAY
             }
             k2.draw_circle(s.pos, UNIT_W/2, color)
+        }
+    }
+
+    for army, side in non_dead_soldiers {
+        points := make([dynamic]vec2, 0, len(army), allocator=context.temp_allocator)
+        for si in army {
+            s := armies[side].soldiers[si]
+            append(&points, s.pos)
+        }
+        outline := convex_hull(points[:], allocator=context.temp_allocator)
+        outline = expand_convex_polygon(outline, 10, allocator=context.temp_allocator)
+        for i in 0..<len(outline) {
+            a, b := outline[i], outline[(i+1)%len(outline)]
+            k2.draw_line(a, b, 3, k2.GRAY)
         }
     }
 
