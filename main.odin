@@ -27,9 +27,10 @@ Army :: struct {
 }
 
 Soldier :: struct {
-    pos:      Vec2,
-    in_fight: int,
-    target:   struct {
+    pos:       Vec2,
+    in_fight:  int,
+    dmg_taken: f32,
+    target:    struct {
         pos:        Vec,
         left_steps: int,
     }
@@ -65,6 +66,10 @@ each_army_goal_pos :: proc (origin: Vec, i: int, n: int) -> (p: Vec) {
     ix  := i%dim.x
     iy  := i/dim.x
     return origin + Vec2{f32(ix), f32(iy)} * UNIT_S + UNIT_M + UNIT_W/2
+}
+
+is_dead :: proc (s: Soldier) -> bool {
+    return s.dmg_taken >= 1
 }
 
 init_armies :: proc () {
@@ -137,30 +142,48 @@ step :: proc () -> bool {
     }
     draw_cross(goal, k2.ORANGE)
 
+    non_dead_soldiers: [Army_Side][]int
     for army in armies {
-        op_army_side := side_opposite(army.side)
-        op_army      := armies[op_army_side]
+        array := make([dynamic]int, 0, len(army.soldiers), allocator=context.temp_allocator)
+        for s, i in army.soldiers {
+            if is_dead(s) do continue
+            append(&array, i)
+        }
+        non_dead_soldiers[army.side] = array[:]
+    }
 
-        op_army_points := op_army.soldiers.pos[:len(op_army.soldiers)]
-        op_army_tree   := qt.build(op_army_points, context.temp_allocator)
+    for army in armies {
+        op_army := armies[side_opposite(army.side)]
 
-        for &s, i in army.soldiers {
-            // set target
-            if s.target.left_steps == 0 {
-                if army.side == .Player {
-                    s.target.pos = each_army_goal_pos(goal, i, len(army.soldiers))
+        op_army_points := make([]qt.Point, len(non_dead_soldiers[op_army.side]), allocator=context.temp_allocator)
+        for si, i in non_dead_soldiers[op_army.side] {
+            op_army_points[i] = qt.Point{
+                pos = op_army.soldiers[si].pos,
+                idx = si,
+            }
+        }
+        op_army_tree := qt.build(op_army_points, context.temp_allocator)
+
+        // set target
+        for si, i in non_dead_soldiers[army.side] {
+            s := &army.soldiers[si]
+
+            if s.target.left_steps > 0 do continue
+
+            if army.side == .Player {
+                s.target.pos = each_army_goal_pos(goal, i, len(non_dead_soldiers[army.side]))
+                s.target.left_steps = rand.int_range(2, 12)
+            } else {
+                p, found := qt.query_nearest(op_army_tree, s.pos)
+                if found {
+                    s.target.pos = p.pos
                     s.target.left_steps = rand.int_range(2, 12)
-                } else {
-                    p, found := qt.query_nearest(op_army_tree, s.pos)
-                    if found {
-                        s.target.pos = p.pos
-                        s.target.left_steps = rand.int_range(2, 12)
 
-                        // in fight if close
-                        if la.distance(p.pos, s.pos) < 20 {
-                            target_s := &op_army.soldiers[p.idx]
-                            target_s.in_fight += 1
-                        }
+                    // in fight if close
+                    if la.distance(p.pos, s.pos) < 10 {
+                        target_s := &op_army.soldiers[p.idx]
+                        target_s.in_fight += 1
+                        target_s.dmg_taken += 0.05
                     }
                 }
             }
@@ -171,8 +194,13 @@ step :: proc () -> bool {
     for army in armies {
         for &s, i in army.soldiers {
             // update pos towards target
-            update: if s.target.left_steps != 0 {
+            update: {
+
+                if is_dead(s) do break update
+
+                if s.target.left_steps == 0 do break update
                 s.target.left_steps -= 1
+
                 d := s.pos - s.target.pos
                 if d == 0 do break update
                 d = la.normalize(d)
@@ -183,6 +211,9 @@ step :: proc () -> bool {
                     s.in_fight = 0
                 }
 
+                // slow down damaged individuals
+                d *= Vec(1-s.dmg_taken)
+
                 n := s.pos - d
                 if !math.is_nan(n.x) &&
                    !math.is_nan(n.y) &&
@@ -192,7 +223,11 @@ step :: proc () -> bool {
                 }
             }
 
-            k2.draw_circle(s.pos, UNIT_W/2, army.color)
+            color := army.color
+            if is_dead(s) {
+                color = k2.DARK_GRAY
+            }
+            k2.draw_circle(s.pos, UNIT_W/2, color)
         }
     }
 

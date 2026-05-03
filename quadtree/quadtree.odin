@@ -45,14 +45,14 @@ middle :: proc (a, b: Vec2) -> Vec2 {
     return (a + b) * 0.5
 }
 
-bbox_of :: proc (points: []Vec2) -> (box: Rect) {
+bbox_of :: proc (points: []Point) -> (box: Rect) {
     box.pos  = math.F32_MAX
     box.size = math.F32_MIN
     for p in points {
-        if p.x < box.pos.x  {box.pos.x  = p.x}
-        if p.y < box.pos.y  {box.pos.y  = p.y}
-        if p.x > box.size.x {box.size.x = p.x}
-        if p.y > box.size.y {box.size.y = p.y}
+        if p.pos.x < box.pos.x  {box.pos.x  = p.pos.x}
+        if p.pos.y < box.pos.y  {box.pos.y  = p.pos.y}
+        if p.pos.x > box.size.x {box.size.x = p.pos.x}
+        if p.pos.y > box.size.y {box.size.y = p.pos.y}
     }
     box.size -= box.pos
     return
@@ -60,14 +60,11 @@ bbox_of :: proc (points: []Vec2) -> (box: Rect) {
 
 MAX_DEPTH :: 64
 
-build :: proc (points: []Vec2, allocator := context.allocator) -> (qt: Quadtree) {
+build :: proc (points: []Point, allocator := context.allocator) -> (qt: Quadtree) {
     init(&qt, allocator)
     qt.bbox = bbox_of(points)
     qt.points = make([]Point, len(points), allocator=allocator)
-    for &p, i in qt.points {
-        p.pos = points[i]
-        p.idx = i
-    }
+    copy(qt.points, points)
     center := middle(qt.bbox.pos, qt.bbox.pos + qt.bbox.size)
     qt.root = build_impl(&qt, qt.bbox, 0, len(points), center, 0)
     return qt
@@ -77,7 +74,7 @@ build_impl :: proc (qt: ^Quadtree, bbox: Rect, begin_idx, end_idx: int, center: 
 
     count := end_idx - begin_idx
     if count <= 0 {
-        return {} // empty
+        return 0 // empty
     }
 
     node, node_id := node_add(qt)
@@ -133,6 +130,10 @@ node_add :: proc (qt: ^Quadtree) -> (n: ^Node, id: Node_Id) {
 }
 
 node_points :: proc (qt: Quadtree, n: ^Node) -> []Point {
+    if n.children.x.x != 0 || n.children.x.y != 0 ||
+       n.children.y.x != 0 || n.children.y.y != 0 {
+        return nil
+    }
     return qt.points[n.point_begin:n.point_end]
 }
 
@@ -194,17 +195,42 @@ query_nearest :: proc (qt: Quadtree, target: Vec2) -> (best: Point, found: bool)
     return
 }
 
-_query_nearest :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, target: Vec2, best: ^Point, best_dist: ^f32, found: ^bool) {
+distance_bbox_sq :: proc (bbox: Rect, target: Vec2) -> f32 {
+    dx: f32
+    dy: f32
+    if target.x < bbox.pos.x {
+        dx = bbox.pos.x - target.x
+    } else if target.x > bbox.pos.x + bbox.size.x {
+        dx = target.x - (bbox.pos.x + bbox.size.x)
+    } else {
+        dx = 0
+    }
+    if target.y < bbox.pos.y {
+        dy = bbox.pos.y - target.y
+    } else if target.y > bbox.pos.y + bbox.size.y {
+        dy = target.y - (bbox.pos.y + bbox.size.y)
+    } else {
+        dy = 0
+    }
+    return dx*dx + dy*dy
+}
 
+_query_nearest :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, target: Vec2, best: ^Point, best_dist: ^f32, found: ^bool) {
     n, ok := node_get(qt, node_id)
-    if !ok do return
+    if !ok {
+        return
+    }
+
+    if distance_bbox_sq(bbox, target) > best_dist^ {
+        return
+    }
 
     for p in node_points(qt, n) {
         d := distance_sq(p.pos, target)
         if d < best_dist^ {
-            best^      = p
+            best^ = p
             best_dist^ = d
-            found^     = true
+            found^ = true
         }
     }
 
