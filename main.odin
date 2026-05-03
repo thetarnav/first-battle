@@ -28,20 +28,14 @@ Army :: struct {
 
 Soldier :: struct {
     pos:       Vec2,
-    in_fight:  int,
+    in_fight:  f32,
     dmg_taken: f32,
     target:    struct {
+        idx:        Maybe(int),
         pos:        Vec,
         left_steps: int,
     }
 }
-
-// Target :: union {Vec, Soldier_Handle}
-//
-// Soldier_Handle :: struct {
-//     side: Army_Side,
-//     idx:  int,
-// }
 
 armies: [Army_Side]Army = {
     .Player = {side=.Player, name="Player", color=k2.GREEN},
@@ -152,19 +146,24 @@ step :: proc () -> bool {
         non_dead_soldiers[army.side] = array[:]
     }
 
+    army_trees: [Army_Side]qt.Quadtree
     for army in armies {
-        op_army := armies[side_opposite(army.side)]
 
-        op_army_points := make([]qt.Point, len(non_dead_soldiers[op_army.side]), allocator=context.temp_allocator)
-        for si, i in non_dead_soldiers[op_army.side] {
-            op_army_points[i] = qt.Point{
-                pos = op_army.soldiers[si].pos,
+        army_points := make([]qt.Point, len(non_dead_soldiers[army.side]), allocator=context.temp_allocator)
+        for si, i in non_dead_soldiers[army.side] {
+            army_points[i] = qt.Point{
+                pos = army.soldiers[si].pos,
                 idx = si,
             }
         }
-        op_army_tree := qt.build(op_army_points, context.temp_allocator)
+        army_trees[army.side] = qt.build(army_points, context.temp_allocator)
+    }
 
-        // set target
+    // set target
+    for army in armies {
+        op_army := armies[side_opposite(army.side)]
+        op_army_tree := army_trees[op_army.side]
+
         for si, i in non_dead_soldiers[army.side] {
             s := &army.soldiers[si]
 
@@ -176,20 +175,49 @@ step :: proc () -> bool {
             } else {
                 p, found := qt.query_nearest(op_army_tree, s.pos)
                 if found {
-                    s.target.pos = p.pos
+                    s.target.idx        = p.idx
+                    s.target.pos        = p.pos
                     s.target.left_steps = rand.int_range(2, 12)
 
-                    // in fight if close
-                    if distance(p.pos, s.pos) < 10 {
-                        target_s := &op_army.soldiers[p.idx]
-                        target_s.in_fight += 1
-                        target_s.dmg_taken += 0.05
+                    enemy := &op_army.soldiers[p.idx]
+                    if distance(enemy.pos, s.pos) < 10 {
+                        enemy.in_fight  += 0.8
+                        enemy.dmg_taken += 0.05
+                        s.in_fight      += 1
+                        s.dmg_taken     += 0.04
+                        continue
                     }
                 }
             }
         }
-        // k2.draw_text(army.name, army_pos - {0, 20}, 20, color)
     }
+
+    // // fight
+    // for army in armies {
+    //     op_army := armies[side_opposite(army.side)]
+    //     op_army_tree := army_trees[op_army.side]
+    //
+    //     for si, i in non_dead_soldiers[army.side] {
+    //         s := &army.soldiers[si]
+    //
+    //         if idx, targets_soldier := s.target.idx.?; targets_soldier {
+    //             enemy := &op_army.soldiers[idx]
+    //             if distance(enemy.pos, s.pos) < 10 {
+    //                 enemy.in_fight  += 1
+    //                 enemy.dmg_taken += 0.05
+    //                 continue
+    //             }
+    //         }
+    //         if s.in_fight > 0 {
+    //             p, found := qt.query_nearest(op_army_tree, s.pos)
+    //             if found && distance(p.pos, s.pos) < 10 {
+    //                 enemy := &op_army.soldiers[p.idx]
+    //                 enemy.in_fight += 1
+    //                 enemy.dmg_taken += 0.05
+    //             }
+    //         }
+    //     }
+    // }
 
     for army in armies {
         for &s, i in army.soldiers {
@@ -212,7 +240,7 @@ step :: proc () -> bool {
                 }
 
                 // slow down damaged individuals
-                d *= Vec(1-s.dmg_taken)
+                d *= Vec((1-s.dmg_taken)/2+0.5)
 
                 n := s.pos - d
                 if !math.is_nan(n.x) &&
@@ -238,6 +266,14 @@ step :: proc () -> bool {
             append(&points, s.pos)
         }
         outline := convex_hull(points[:], allocator=context.temp_allocator)
+        if len(outline) < 3 {
+            p := armies[side].soldiers[army[0]].pos
+            outline = {
+                p + {+6, +3},
+                p + {-6, +3},
+                p + { 0, -3},
+            }
+        }
         outline = expand_convex_polygon(outline, 10, allocator=context.temp_allocator)
         for i in 0..<len(outline) {
             a, b := outline[i], outline[(i+1)%len(outline)]
@@ -247,6 +283,9 @@ step :: proc () -> bool {
 
     fps := dt*60*1000
     k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
+
+    k2.draw_text(fmt.tprintf("player army = %d", len(non_dead_soldiers[.Player])), {10, 30}, 20, k2.WHITE)
+    k2.draw_text(fmt.tprintf("enemy  army = %d", len(non_dead_soldiers[.Enemy])),  {10, 50}, 20, k2.WHITE)
 
     k2.present()
 
