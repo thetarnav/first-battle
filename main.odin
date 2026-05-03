@@ -59,6 +59,13 @@ side_opposite :: proc (side: Army_Side) -> Army_Side {
     return Army_Side((int(side)+1) % (int(max(Army_Side))+1))
 }
 
+each_army_goal_pos :: proc (origin: Vec, i: int, n: int) -> (p: Vec) {
+    dim := army_count_dim(n)
+    ix  := i%dim.x
+    iy  := i/dim.x
+    return origin + Vec2{f32(ix), f32(iy)} * UNIT_S + UNIT_M + UNIT_W/2
+}
+
 init_armies :: proc () {
 
     for &army in armies {
@@ -71,15 +78,11 @@ init_armies :: proc () {
                       army_n   = 420
         }
 
-        army_dim_n := army_count_dim(army_n)
-
         reserve(&army.soldiers, army_n)
         resize (&army.soldiers, army_n)
 
         for &s, i in army.soldiers {
-            ix  := i%army_dim_n.x
-            iy  := i/army_dim_n.x
-            s.pos = army_pos + Vec2{f32(ix), f32(iy)} * UNIT_S + UNIT_M + UNIT_W/2
+            s.pos = each_army_goal_pos(army_pos, i, army_n)
         }
     }
 }
@@ -145,7 +148,7 @@ step :: proc () -> bool {
             // set target
             if s.target.left_steps == 0 {
                 if army.side == .Player {
-                    s.target.pos = goal
+                    s.target.pos = each_army_goal_pos(goal, i, len(army.soldiers))
                     s.target.left_steps = rand.int_range(1, 10)
                 } else {
                     p, found := qt.query_nearest(op_army_tree, s.pos)
