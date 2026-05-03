@@ -3,11 +3,13 @@ package first_battle
 import "core:fmt"
 import "core:math"
 import la "core:math/linalg"
+import "core:math/rand"
 import k2 "./karl2d"
 import qt "./quadtree"
 
 Vec2  :: k2.Vec2
 Color :: k2.Color
+Vec   :: Vec2
 
 main :: proc () {
     init()
@@ -26,13 +28,18 @@ Army :: struct {
 
 Soldier :: struct {
     pos:    Vec2,
-    target: Maybe(Soldier_Handle),
+    target: struct {
+        pos:        Vec,
+        left_steps: int,
+    }
 }
 
-Soldier_Handle :: struct {
-    side: Army_Side,
-    idx:  int,
-}
+// Target :: union {Vec, Soldier_Handle}
+//
+// Soldier_Handle :: struct {
+//     side: Army_Side,
+//     idx:  int,
+// }
 
 armies: [Army_Side]Army = {
     .Player = {side=.Player, name="Player", color=k2.GREEN},
@@ -103,6 +110,8 @@ step :: proc () -> bool {
     ws := k2.get_screen_size()
     wc := ws/2
 
+    goal := Vec2{500, 500}
+
     k2.draw_line(wc - {20, 0}, wc + {20, 0}, 3, k2.DARK_GRAY)
     k2.draw_line(wc - {0, 20}, wc + {0, 20}, 3, k2.DARK_GRAY)
 
@@ -116,26 +125,25 @@ step :: proc () -> bool {
         for &s, i in army.soldiers {
 
             // set target
-            if _, has_target := s.target.?; !has_target {
-                p, found := qt.query_nearest(op_army_tree, s.pos)
-                if found {
-                    s.target = Soldier_Handle{
-                        side = op_army_side,
-                        idx  = p.idx,
-                    }
+            if s.target.left_steps == 0 {
+                if army.side == .Player {
+                    s.target.pos = goal
+                    s.target.left_steps = -1
                 } else {
-                    // fmt.println(s, p, found)
+                    p, found := qt.query_nearest(op_army_tree, s.pos)
+                    if found {
+                        s.target.pos = p.pos
+                        s.target.left_steps = rand.int_range(1, 10)
+                    }
                 }
             }
 
             // update pos towards target
-            update: if target, has_target := s.target.?; has_target {
-                d := s.pos - op_army.soldiers[target.idx].pos
+            update: if s.target.left_steps != 0 {
+                s.target.left_steps -= 1
+                d := s.pos - s.target.pos
                 if d == 0 do break update
-                l := la.length(d)
-                if l == 0 do break update
-                c := d/l
-                n := s.pos - c
+                n := s.pos - la.normalize(d)
                 if !math.is_nan(n.x) &&
                    !math.is_nan(n.y) &&
                    !math.is_inf(n.x) &&
