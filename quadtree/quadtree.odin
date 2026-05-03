@@ -6,17 +6,19 @@ import "core:math"
 Vec2 :: [2]f32
 
 Node_Id  :: distinct u32
-NIL_NODE :: Node_Id(0xFFFFFFFF)
 
 Quadtree :: struct {
-    bbox:         Rect,
-    root:         Node_Id,
-    nodes:        [dynamic]Node,
-    points:       []Point,
-    point_ranges: [dynamic]u32,
+    bbox:   Rect,
+    root:   Node_Id,
+    nodes:  [dynamic]Node,
+    points: []Point,
 }
 
-Node :: [2][2]Node_Id
+Node :: struct {
+    children:    [2][2]Node_Id,
+    point_begin: int,
+    point_end:   int,
+}
 
 Rect :: struct {
     pos:  Vec2,
@@ -29,17 +31,14 @@ Point :: struct {
 }
 
 init :: proc (qt: ^Quadtree, allocator := context.allocator) {
-    qt.nodes        = make([dynamic]Node, allocator=allocator)
-    qt.points       = {}
-    qt.point_ranges = make([dynamic]u32,  allocator=allocator)
-    qt.root         = NIL_NODE
+    qt ^= {}
+    qt.nodes  = make([dynamic]Node, allocator=allocator)
     return
 }
 
 cleanup :: proc (qt: ^Quadtree) {
     delete(qt.nodes)
     delete(qt.points)
-    delete(qt.point_ranges)
 }
 
 middle :: proc (a, b: Vec2) -> Vec2 {
@@ -59,6 +58,8 @@ bbox_of :: proc (points: []Vec2) -> (box: Rect) {
     return
 }
 
+MAX_DEPTH :: 64
+
 build :: proc (points: []Vec2, allocator := context.allocator) -> (qt: Quadtree) {
     init(&qt, allocator)
     qt.bbox = bbox_of(points)
@@ -68,23 +69,23 @@ build :: proc (points: []Vec2, allocator := context.allocator) -> (qt: Quadtree)
         p.idx = i
     }
     center := middle(qt.bbox.pos, qt.bbox.pos + qt.bbox.size)
-    qt.root = build_impl(&qt, qt.bbox, 0, len(points), center)
-    append(&qt.point_ranges, u32(len(points)))
+    qt.root = build_impl(&qt, qt.bbox, 0, len(points), center, 0)
     return qt
 }
 
-build_impl :: proc (qt: ^Quadtree, bbox: Rect, begin_idx, end_idx: int, center: Vec2) -> Node_Id {
+build_impl :: proc (qt: ^Quadtree, bbox: Rect, begin_idx, end_idx: int, center: Vec2, depth: int) -> Node_Id {
+
     count := end_idx - begin_idx
     if count <= 0 {
-        return NIL_NODE
+        return {} // empty
     }
 
-    node_id := Node_Id(len(qt.nodes))
-    append(&qt.nodes, Node{NIL_NODE, NIL_NODE})
-    append(&qt.point_ranges, u32(begin_idx))
+    node, node_id := node_add(qt)
+    node.point_begin = begin_idx
+    node.point_end   = end_idx
 
-    if count <= 1 {
-        return node_id
+    if count == 1 || depth >= MAX_DEPTH {
+        return node_id // leaf node
     }
 
     split_y       := partition(qt.points[:], begin_idx, end_idx, center.y, true)
@@ -99,10 +100,10 @@ build_impl :: proc (qt: ^Quadtree, bbox: Rect, begin_idx, end_idx: int, center: 
     sw_bbox: Rect = {pos, half}
     se_bbox: Rect = {pos + Vec2{half.x, 0}, half}
 
-    qt.nodes[node_id].x.x = build_impl(qt, sw_bbox, begin_idx, split_x_lower, middle(sw_bbox.pos, sw_bbox.pos + sw_bbox.size))
-    qt.nodes[node_id].x.y = build_impl(qt, se_bbox, split_x_lower, split_y,   middle(se_bbox.pos, se_bbox.pos + se_bbox.size))
-    qt.nodes[node_id].y.x = build_impl(qt, nw_bbox, split_y, split_x_upper,   middle(nw_bbox.pos, nw_bbox.pos + nw_bbox.size))
-    qt.nodes[node_id].y.y = build_impl(qt, ne_bbox, split_x_upper, end_idx,   middle(ne_bbox.pos, ne_bbox.pos + ne_bbox.size))
+    node.children.x.x = build_impl(qt, sw_bbox, begin_idx, split_x_lower, middle(sw_bbox.pos, sw_bbox.pos + sw_bbox.size), depth + 1)
+    node.children.x.y = build_impl(qt, se_bbox, split_x_lower, split_y,   middle(se_bbox.pos, se_bbox.pos + se_bbox.size), depth + 1)
+    node.children.y.x = build_impl(qt, nw_bbox, split_y, split_x_upper,   middle(nw_bbox.pos, nw_bbox.pos + nw_bbox.size), depth + 1)
+    node.children.y.y = build_impl(qt, ne_bbox, split_x_upper, end_idx,   middle(ne_bbox.pos, ne_bbox.pos + ne_bbox.size), depth + 1)
 
     return node_id
 }
@@ -119,13 +120,20 @@ partition :: proc (points: []Point, begin, end: int, threshold: f32, by_y: bool)
     return i
 }
 
-node_points :: proc (qt: Quadtree, node_id: Node_Id) -> []Point {
-    if node_id == NIL_NODE || node_id >= Node_Id(len(qt.nodes)) {
-        return nil
-    }
-    begin := qt.point_ranges[node_id]
-    end   := qt.point_ranges[node_id+1]
-    return qt.points[begin:end]
+node_get :: proc (qt: Quadtree, node_id: Node_Id) -> (n: ^Node, ok: bool) {
+    idx := int(node_id-1)
+    if idx < 0 || idx >= len(qt.nodes) do return
+    return &qt.nodes[idx], true
+}
+node_add :: proc (qt: ^Quadtree) -> (n: ^Node, id: Node_Id) {
+    append_nothing(&qt.nodes)
+    id = Node_Id(len(qt.nodes))
+    n, _ = node_get(qt^, id)
+    return
+}
+
+node_points :: proc (qt: Quadtree, n: ^Node) -> []Point {
+    return qt.points[n.point_begin:n.point_end]
 }
 
 contains :: proc (rect: Rect, point: Vec2) -> bool {
@@ -144,33 +152,33 @@ intersects :: proc (rect: Rect, range: Rect) -> bool {
 
 query :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, range: Rect, found: ^[dynamic]Point) {
 
-    if node_id == NIL_NODE || !intersects(bbox, range) {
-        return
-    }
+    n, ok := node_get(qt, node_id)
+    if !ok do return
 
-    for p in node_points(qt, node_id) {
+    if !intersects(bbox, range) do return
+
+    for p in node_points(qt, n) {
         if contains(range, p.pos) {
             append(found, p)
         }
     }
 
-    n    := &qt.nodes[node_id]
-    half := bbox.size * 0.5
-    pos  := bbox.pos
+    half  := bbox.size * 0.5
+    pos   := bbox.pos
 
     nw_bbox: Rect = {pos + Vec2{0, half.y}, half}
     ne_bbox: Rect = {pos + half, half}
     sw_bbox: Rect = {pos, half}
     se_bbox: Rect = {pos + Vec2{half.x, 0}, half}
 
-    query(qt, n.x.x, sw_bbox, range, found)
-    query(qt, n.x.y, se_bbox, range, found)
-    query(qt, n.y.x, nw_bbox, range, found)
-    query(qt, n.y.y, ne_bbox, range, found)
+    query(qt, n.children.x.x, sw_bbox, range, found)
+    query(qt, n.children.x.y, se_bbox, range, found)
+    query(qt, n.children.y.x, nw_bbox, range, found)
+    query(qt, n.children.y.y, ne_bbox, range, found)
 }
 
 query_radius :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, center: Vec2, radius: f32, found: ^[dynamic]Point) {
-    range := Rect{center-radius, radius*2}
+    range := Rect{center - radius, radius * 2}
     query(qt, node_id, bbox, range, found)
 }
 
@@ -187,20 +195,19 @@ query_nearest :: proc (qt: Quadtree, target: Vec2) -> (best: Point, found: bool)
 }
 
 _query_nearest :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, target: Vec2, best: ^Point, best_dist: ^f32, found: ^bool) {
-    if node_id == NIL_NODE {
-        return
-    }
 
-    for p in node_points(qt, node_id) {
+    n, ok := node_get(qt, node_id)
+    if !ok do return
+
+    for p in node_points(qt, n) {
         d := distance_sq(p.pos, target)
         if d < best_dist^ {
-            best^ = p
+            best^      = p
             best_dist^ = d
-            found^ = true
+            found^     = true
         }
     }
 
-    n := &qt.nodes[node_id]
     half := bbox.size * 0.5
     pos  := bbox.pos
 
@@ -209,8 +216,8 @@ _query_nearest :: proc (qt: Quadtree, node_id: Node_Id, bbox: Rect, target: Vec2
     sw_bbox: Rect = {pos, half}
     se_bbox: Rect = {pos + Vec2{half.x, 0}, half}
 
-    _query_nearest(qt, n.x.x, sw_bbox, target, best, best_dist, found)
-    _query_nearest(qt, n.x.y, se_bbox, target, best, best_dist, found)
-    _query_nearest(qt, n.y.x, nw_bbox, target, best, best_dist, found)
-    _query_nearest(qt, n.y.y, ne_bbox, target, best, best_dist, found)
+    _query_nearest(qt, n.children.x.x, sw_bbox, target, best, best_dist, found)
+    _query_nearest(qt, n.children.x.y, se_bbox, target, best, best_dist, found)
+    _query_nearest(qt, n.children.y.x, nw_bbox, target, best, best_dist, found)
+    _query_nearest(qt, n.children.y.y, ne_bbox, target, best, best_dist, found)
 }
