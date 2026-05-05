@@ -35,7 +35,7 @@ Rect :: struct {
 }
 AABB :: Rect
 
-TAU	    :: la.TAU
+TAU     :: la.TAU
 PI      :: la.PI
 HALF_PI :: la.PI / 2
 
