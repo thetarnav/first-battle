@@ -32,35 +32,73 @@ Soldier :: struct {
     side: Army_Side,
     pos:  Vec2,
 }
-
 Soldier_Idx :: distinct u16
+Soldier_Arr :: #soa[dynamic]Soldier
+Soldier_Ptr :: #soa^Soldier_Arr
 
 armies: [Army_Side]Army = {
-    .Player = {side=.Player, name="Player", color=k2.GREEN},
+    .Player = {side=.Player, name="Player", color=k2.ORANGE},
     .Enemy  = {side=.Enemy,  name="Enemy",  color=k2.RED},
 }
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
-soldiers: #soa[dynamic]Soldier
+soldiers: Soldier_Arr
+
+selected_soldier: Maybe(Soldier_Idx)
+
+Cell :: struct {
+    soldier: Maybe(Soldier_Idx),
+}
+
+grid: [GRID_N]Cell
 
 GOLDEN_RATIO  :: 1.618
 
-GRID_SIZE        :: 128
+GRID_X           :: 128
+GRID_Y           :: 100
+GRID_N           :: GRID_X*GRID_Y
+GRID_SIZE        :: Vec2{GRID_X, GRID_Y}
+GRID_AR          :: f32(GRID_X)/f32(GRID_Y)
 GRID_RECT_MARGIN :: 10
 
 UNIT_W :: 4
 UNIT_M :: 3
 UNIT_S :: UNIT_W + UNIT_M*2
 
-get_grid_rect :: proc () -> Rect {
-    ws := k2.get_screen_size()
-    rect := Rect{GRID_RECT_MARGIN, min(ws.x, ws.y) - GRID_RECT_MARGIN*2}
-    rect.pos += (ws - GRID_RECT_MARGIN*2 - rect.size)/2
-    return rect
+screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
+    rect := get_grid_rect()
+    pos := pos
+    pos -= rect.pos
+    pos = pos/rect.size * GRID_SIZE
+    return pos
+}
+world_pos_from_screen :: screen_pos_to_world
+
+get_grid_rect :: proc () -> (rect: Rect) {
+    max := k2.get_screen_size() - GRID_RECT_MARGIN*2
+    rect.size = max
+    rect.size.x = min(rect.size.x, rect.size.y * GRID_AR)
+    rect.size.y = min(rect.size.y, rect.size.x / GRID_AR)
+    rect.pos = GRID_RECT_MARGIN + (max - rect.size)/2
+    return
 }
 
-soldier_get :: proc (idx: Soldier_Idx) -> #soa^#soa[dynamic]Soldier {
+grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
+    rect := get_grid_rect()
+    if pos.x < 0 ||
+       pos.y < 0 ||
+       pos.x > rect.size.x ||
+       pos.y > rect.size.y {
+        return 0, false
+    }
+    return int(pos.x) + int(pos.y)*GRID_X, true
+}
+grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
+    return &grid[grid_idx_from_pos(pos) or_return], true
+}
+
+soldier_get :: proc (idx: Soldier_Idx) -> Soldier_Ptr {
     return &soldiers[idx]
 }
 
@@ -99,10 +137,25 @@ game_init :: proc () {
 
         s := soldier_get(si)
         s.pos = each_army_goal_pos(army_pos + Vec2(0.5), -0.2, i, army_size)
+
+        cell := grid_cell_from_pos(s.pos) or_continue
+        cell.soldier = si // TODO: collision checks
     }
 }
 
 update :: proc (dt: f32) -> bool {
+
+    mouse_pos := k2.get_mouse_position()
+
+    selected_soldier = nil
+    check_mouse: if true || k2.mouse_button_is_held(.Left) {
+        mouse_world := world_pos_from_screen(mouse_pos)
+        cell := grid_cell_from_pos(mouse_world) or_break check_mouse
+        if si, ok := cell.soldier.?; ok {
+            selected_soldier = si
+        }
+    }
+
     if k2.key_went_down(.Q) {
         return false
     }
@@ -122,15 +175,15 @@ frame :: proc (dt: f32) -> bool {
 
     grid_rect := get_grid_rect()
     {
-        for xi in 0..=GRID_SIZE {
-            xp := f32(xi)/GRID_SIZE
+        for xi in 0..=GRID_X {
+            xp := f32(xi)/GRID_X
             x  := grid_rect.size.x * xp
             s  := grid_rect.pos + {x, 0}
             e  := grid_rect.pos + {x, grid_rect.size.y}
             k2.draw_line(s, e, 1, k2.DARK_GRAY)
         }
-        for yi in 0..=GRID_SIZE {
-            yp := f32(yi)/GRID_SIZE
+        for yi in 0..=GRID_Y {
+            yp := f32(yi)/GRID_Y
             y  := grid_rect.size.y * yp
             s  := grid_rect.pos + {0, y}
             e  := grid_rect.pos + {grid_rect.size.x, y}
@@ -138,17 +191,26 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    for s in soldiers {
+    for s, i in soldiers {
+        si := Soldier_Idx(i)
 
         color := army_player.color
+        size := f32(UNIT_W)
         // color := army.color
         // if is_dead(s) {
         //     color = k2.DARK_GRAY
         // }
         pos := s.pos * (grid_rect.size/GRID_SIZE)
         pos += grid_rect.pos
-        k2.draw_circle(pos, UNIT_W/2, color)
+        if selected_soldier == si {
+            color = k2.BLUE
+            size *= 2
+        }
+        k2.draw_circle(pos, size, color)
     }
+
+    mouse_pos := k2.get_mouse_position()
+    draw_cross(mouse_pos, k2.GREEN)
 
     return true
 }
