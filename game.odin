@@ -111,6 +111,12 @@ grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
 grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return &grid[grid_idx_from_pos(pos) or_return], true
 }
+grid_cell_get_safe :: proc (idx: int) -> (cell: Cell, ok: bool) {
+    if in_bounds(grid, idx) {
+        return grid[idx], true
+    }
+    return
+}
 cell_center :: proc (idx: int) -> (pos: Vec2) {
     return Vec2(grid_coord_from_idx(idx)) + Vec2(0.5)
 }
@@ -220,7 +226,7 @@ next_surrounding_cell :: proc "contextless" (p: [2]int) -> [2]int {
 
 game_init :: proc () {
 
-    update(0) // set initial globals
+    update_frame_globals()
 
     soldiers = make(type_of(soldiers), 0, 10000, allocator=context.allocator)
 
@@ -245,19 +251,35 @@ game_init :: proc () {
     }
 }
 
-update :: proc (dt: f32) -> bool {
-
+update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
     grid_rect   = get_grid_rect()
+}
+
+update :: proc (dt: f32) -> bool {
+
+    update_frame_globals()
 
     mouse_pos := k2.get_mouse_position()
     mouse_world := world_pos_from_screen(mouse_pos)
 
     selected_soldier = nil
     check_mouse_hover: {
-        cell := grid_cell_from_pos(mouse_world) or_break check_mouse_hover
-        if si, ok := cell.soldier.?; ok {
-            selected_soldier = si
+        cell_idx := grid_idx_from_pos(mouse_world) or_break check_mouse_hover
+        coord: [2]int
+        origin := grid_coord_from_idx(cell_idx)
+        r := 2
+        d := r*2
+        w := d+1
+        steps := w*w - 4
+        for _ in 0..<steps {
+            cell, _ := grid_cell_get_safe(cell_idx)
+            if si, cell_taken := cell.soldier.?; cell_taken {
+                selected_soldier = si
+                break
+            }
+            coord = next_surrounding_cell(coord)
+            cell_idx = grid_idx_from_coord(origin + coord)
         }
     }
 
