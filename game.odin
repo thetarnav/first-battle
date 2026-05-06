@@ -6,6 +6,7 @@ import la "core:math/linalg"
 import "core:math/rand"
 import k2 "./karl2d"
 import qt "./quadtree"
+import color "./color"
 
 Vec2  :: k2.Vec2
 Color :: k2.Color
@@ -87,6 +88,12 @@ get_grid_rect :: proc () -> (rect: Rect) {
     return
 }
 
+grid_idx_from_coord :: proc (coord: [2]int) -> int {
+    return coord.x + coord.y*GRID_X
+}
+grid_coord_from_idx :: proc (idx: int) -> (coord: [2]int) {
+    return {idx%GRID_X, idx/GRID_X}
+}
 grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
     if pos.x < 0 ||
        pos.y < 0 ||
@@ -94,10 +101,13 @@ grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
        pos.y >= grid_rect.size.y {
         return 0, false
     }
-    return int(pos.x) + int(pos.y)*GRID_X, true
+    return grid_idx_from_coord(([2]int)(pos)), true
 }
 grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return &grid[grid_idx_from_pos(pos) or_return], true
+}
+cell_center :: proc (idx: int) -> (pos: Vec2) {
+    return Vec2(grid_coord_from_idx(idx)) + Vec2(0.5)
 }
 
 soldier_get :: proc (idx: Soldier_Idx) -> Soldier_Ptr {
@@ -146,73 +156,61 @@ soldier_set_pos :: proc (s: Soldier_Ptr, pos: Vec2) -> (ok: bool) {
 }
 soldier_set_pos_force :: proc (s: Soldier_Ptr, pos: Vec2) {
 
-    cell_idx, pos_in_cell := grid_idx_from_pos(pos)
-    if !pos_in_cell {
+    cell_idx, pos_in_grid := grid_idx_from_pos(pos)
+
+    // pos outside of the grid - pick any cell
+    if !pos_in_grid {
         fmt.printfln("tried to set position outside of the grid: %v", pos)
         if s.cell != nil do return
         // add to any cell
         for cell, cell_idx in grid {
             if soldier_add_to_cell(s, cell_idx) {
+                s.pos = cell_center(cell_idx)
                 return
             }
         }
         fmt.printfln("No cells left")
     }
 
+    // try adding to the cell on pos
+    if soldier_add_to_cell(s, cell_idx) {
+        s.pos = pos
+        return
+    }
+
+    // if taken, try adding to surrounding cells until found a spot
+    origin := ([2]int)(pos)
+    coord: [2]int
     for {
+        coord = next_surrounding_cell(coord)
+        cell_idx = grid_idx_from_coord(origin + coord)
+
         if soldier_add_to_cell(s, cell_idx) {
+            s.pos = cell_center(cell_idx)
             return
         }
-
-
     }
 }
 
-next_surrounding_cell :: proc (p: [2]int) -> [2]int {
+@require_results
+next_surrounding_cell :: proc "contextless" (p: [2]int) -> [2]int {
 
     l := max(abs(p.x), abs(p.y))
     f := abs(abs(p.x) - abs(p.y))
     d := l-f
 
-    s: int
     switch p {
-    case { d,  l}: s = 7
-    case { d, -l}: s = 6
-    case {-d,  l}: s = 5
-    case {-d, -l}: s = 4
-    case { l,  d}: s = 3
-    case { l, -d}: s = 2
-    case {-l,  d}: s = 1
-    case {-l, -d}: s = 0
+    case { d,  l}: return {-l, -d-1} if f > 0 else {-l-1, 0}
+    case { d, -l}: return { d,  l}
+    case {-d,  l}: return { d, -l}
+    case {-d, -l}: return {-d,  l}
+    case { l,  d}: return {-d, -l}
+    case { l, -d}: return { l,  d}
+    case {-l,  d}: return { l, -d}
+    case {-l, -d}: return {-l,  d}
     }
 
-    if s == 7 || p == 0 {
-        s = 0
-        if f == 0 {
-            l += 1
-            f = l
-        } else {
-            f -= 1
-        }
-    } else {
-        s += 1
-    }
-
-    d = l-f
-
-    p := p
-    switch s {
-    case 7: p = { d,  l}
-    case 6: p = { d, -l}
-    case 5: p = {-d,  l}
-    case 4: p = {-d, -l}
-    case 3: p = { l,  d}
-    case 2: p = { l, -d}
-    case 1: p = {-l,  d}
-    case 0: p = {-l, -d}
-    }
-
-    return p
+    unreachable()
 }
 
 game_init :: proc () {
@@ -239,12 +237,6 @@ game_init :: proc () {
         pos := each_army_goal_pos(army_pos + Vec2(0.5), -0.2, i, army_size)
 
         soldier_set_pos_force(s, pos)
-    }
-
-    p: [2]int
-    for i in 0..<52 {
-        p = next_surrounding_cell(p)
-        fmt.println(p)
     }
 }
 
@@ -334,9 +326,20 @@ frame :: proc (dt: f32) -> bool {
     draw_cross(mouse_pos, k2.GREEN)
 
     p: [2]int
-    for i in 0..<164 {
+    N :: 1000
+    for i in 0..<N {
         p = next_surrounding_cell(p)
-        k2.draw_circle(grid_rect.pos + Vec2(p + {40, 40}) * (grid_rect.size/GRID_SIZE), 3, k2.GREEN)
+        c1 := color.FRGB{1, 1, 0}
+        c2 := color.FRGB{1, 0, 0}
+        c3 := color.FRGB{1, 0, 1}
+        c: color.FRGB
+        cp := f32(i)*2/N
+        if cp < 1 {
+            c = color.lerp(c1, c2, cp)
+        } else {
+            c = color.lerp(c2, c3, cp-1)
+        }
+        k2.draw_circle(grid_rect.pos + Vec2(p + {40, 40}) * (grid_rect.size/GRID_SIZE), 3, k2.Color(color.urgba(c)))
     }
 
     return true
