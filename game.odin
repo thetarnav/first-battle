@@ -31,10 +31,11 @@ Army :: struct {
 }
 
 Soldier :: struct {
-    idx:   Soldier_Idx,
-    side:  Army_Side,
-    pos:   Vec2,
-    cell:  Maybe(int),
+    idx:    Soldier_Idx,
+    side:   Army_Side,
+    pos:    Vec2,
+    cell:   Maybe(int),
+    target: union {Vec2},
 }
 Soldier_Idx :: distinct u16
 Soldier_Arr :: #soa[dynamic]Soldier
@@ -78,6 +79,10 @@ screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - grid_rect.pos)/grid_rect.size * GRID_SIZE
 }
 world_pos_from_screen :: screen_pos_to_world
+world_pos_to_screen :: proc (pos: Vec2) -> Vec2 {
+    return grid_rect.pos + pos * (grid_rect.size/GRID_SIZE)
+}
+screen_pos_from_world :: world_pos_to_screen
 
 get_grid_rect :: proc () -> (rect: Rect) {
     max := window_size - GRID_RECT_MARGIN*2
@@ -257,15 +262,29 @@ update :: proc (dt: f32) -> bool {
     }
 
     check_click: if k2.mouse_button_is_held(.Left) {
+
         army_player.target = mouse_world
+
+        for si, i in army_player.soldiers {
+            s := soldier_get(si)
+            pos := each_army_goal_pos(mouse_world, -0.2, i, len(army_player.soldiers))
+            s.target = pos
+        }
     }
 
     move_soldiers: {
         for army in armies {
             for si in army.soldiers {
                 s := soldier_get(si)
-                if target, ok := army.target.(vec2); ok {
-                    s.pos = exp_decay(s.pos, target, 0.00000001, dt)
+                if target, ok := s.target.(vec2); ok {
+                    d := la.normalize(target - s.pos) * dt * 0.0001
+                    n := s.pos + d
+                    if !math.is_nan(n.x) &&
+                       !math.is_nan(n.y) &&
+                       !math.is_inf(n.x) &&
+                       !math.is_inf(n.y) {
+                        soldier_set_pos(s, n)
+                    }
                 }
             }
         }
@@ -313,8 +332,7 @@ frame :: proc (dt: f32) -> bool {
         // if is_dead(s) {
         //     color = k2.DARK_GRAY
         // }
-        pos := s.pos * (grid_rect.size/GRID_SIZE)
-        pos += grid_rect.pos
+        pos := world_pos_to_screen(s.pos)
         if selected_soldier == si {
             color = k2.BLUE
             size *= 2
