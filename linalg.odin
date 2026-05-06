@@ -475,7 +475,9 @@ correct_extents :: proc (
 
 DT_FIXED :: 1.0/60.0
 
-exp_decay :: proc (a, b, decay: f32, dt: f32 = DT_FIXED) -> f32 {
+exp_decay :: proc (a, b: $T, decay: f32, dt: f32 = DT_FIXED) -> T
+    where intrinsics.type_is_float(intrinsics.type_elem_type(T))
+{
 	return b + (a-b) * exp(-decay * (dt/DT_FIXED))
 }
 
