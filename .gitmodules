@@ -1,3 +1,6 @@
 [submodule "karl2d"]
 	path = karl2d
 	url = git@github.com:karl-zylinski/karl2d.git
+[submodule "grid"]
+	path = grid
+	url = git@github.com:thetarnav/odin-grid.git
