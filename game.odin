@@ -8,6 +8,7 @@ import "core:math/rand"
 import k2 "./karl2d"
 import "./color"
 import "./grid"
+import astar "./grid/path"
 
 Vec2  :: k2.Vec2
 Color :: k2.Color
@@ -34,7 +35,7 @@ Army :: struct {
 Company :: struct {
     name:     string,
     units:    []Troop_Idx,
-    target:   union {vec2},
+    // target:   union {vec2},
 }
 Company_Idx :: distinct u16
 
@@ -49,7 +50,7 @@ Troop :: struct {
     ci:       Company_Idx,
     pos:      Vec2,
     cell:     Maybe(Cell_Idx),
-    target:   union {Vec2},
+    target:   union {Cell_Idx},
 }
 Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
@@ -293,7 +294,6 @@ update :: proc (dt: f32) -> bool {
                 side = troop.side,
                 idx  = troop.ci,
             }
-            fmt.println(selected_company)
         }
         else if selected, is_selected := selected_company.?; is_selected {
             // set selected company's target
@@ -308,9 +308,7 @@ update :: proc (dt: f32) -> bool {
                 for {
                     defer coord = grid.next_surrounding_cell(coord)
 
-                    cell_idx := Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
-
-                    s.target = cell_center(cell_idx)
+                    s.target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
                     break
                 }
             }
@@ -318,11 +316,31 @@ update :: proc (dt: f32) -> bool {
     }
 
     move_troops: {
+
+        walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
+        for cell, i in grid.slice(&board) {
+            walls.data[i] = cell.troop != nil
+        }
+
         for _, i in troops {
             troop := &troops[i]
 
-            if target, ok := troop.target.(vec2); ok {
-                d := la.normalize(target - troop.pos) * dt * 0.02
+            path := make([dynamic]grid.Coord, allocator=context.temp_allocator)
+
+            if target, ok := troop.target.(Cell_Idx); ok {
+
+                start := board_coord_from_pos(troop.pos) or_continue
+                end   := grid.coord(board, target)
+
+                clear(&path)
+                astar.astar(&path, walls,  start, end, allocator=context.temp_allocator)
+
+                if len(path) == 0 do continue
+
+                coord := path[0]
+                assert(coord != start)
+
+                d := la.normalize(Vec2(coord) + Vec2(0.5) - troop.pos) * dt * 0.02
                 n := troop.pos + d
                 if !math.is_nan(n.x) &&
                    !math.is_nan(n.y) &&
