@@ -38,8 +38,9 @@ Company :: struct {
 }
 
 Troop :: struct {
-    idx:      Troop_Idx,
     side:     Army_Side,
+    si:       Troop_Idx,
+    ci:       int,
     pos:      Vec2,
     cell:     Maybe(int),
     target:   union {Vec2},
@@ -47,6 +48,11 @@ Troop :: struct {
 Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
+
+Company_Handle :: struct {
+    side: Army_Side,
+    idx:  int,
+}
 
 armies: [Army_Side]Army = {
     .Player = {side=.Player, name="Player", color=k2.ORANGE},
@@ -65,7 +71,8 @@ initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, cou
 
 troops: Troop_Arr
 
-selected_troop: Maybe(Troop_Idx)
+hovered_troop: Maybe(Troop_Idx)
+selected_company: Maybe(Company_Handle)
 
 Cell :: struct {
     troop: Maybe(Troop_Idx),
@@ -147,14 +154,14 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: int) -> (ok: bool) {
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
 
     prev_troop, has_prev_troop := cell.troop.?
-    if has_prev_troop && prev_troop != s.idx do return
+    if has_prev_troop && prev_troop != s.si do return
 
     if prev_idx, has_prev_idx := s.cell.?; has_prev_idx {
         prev := grid.ptr_idx(&board, prev_idx)
         prev.troop = nil
     }
 
-    cell.troop = s.idx
+    cell.troop = s.si
     s.cell = cell_idx
 
     return true
@@ -229,9 +236,10 @@ game_init :: proc () {
                 append_nothing_soa(&troops)
 
                 s := troop_get(si)
-                s.idx = si
-                pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
+                s.si = si
+                s.ci = ci
 
+                pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
             }
         }
@@ -250,7 +258,7 @@ update :: proc (dt: f32) -> bool {
     mouse_pos := k2.get_mouse_position()
     mouse_world := world_pos_from_screen(mouse_pos)
 
-    selected_troop = nil
+    hovered_troop = nil
     check_mouse_hover: {
         coord: Coord
         origin := board_coord_from_pos(mouse_world) or_break check_mouse_hover
@@ -264,7 +272,7 @@ update :: proc (dt: f32) -> bool {
             cell := grid.get_safe(board, origin + coord) or_continue
             si := cell.troop.? or_continue
 
-            selected_troop = si
+            hovered_troop = si
             break
         }
     }
@@ -274,20 +282,36 @@ update :: proc (dt: f32) -> bool {
         // ignore clicks outside of the grid
         _ = grid_idx_from_pos(mouse_world) or_break check_click
 
-        // for si, i in army_player.troops {
-        //     s := troop_get(si)
-        //     pos := each_army_goal_pos(mouse_world, -0.2, i, len(army_player.troops))
-        //     coord: Coord
-        //     origin := Coord(pos)
-        //     for {
-        //         defer coord = grid.next_surrounding_cell(coord)
-        //
-        //         cell_idx := grid.idx_safe(board, origin + coord) or_continue
-        //
-        //         s.target = cell_center(cell_idx)
-        //         break
-        //     }
-        // }
+        if si, hovering_troop := hovered_troop.?; hovering_troop {
+            // select company
+
+            troop := troop_get(si)
+            selected_company = Company_Handle{
+                side = troop.side,
+                idx  = troop.ci,
+            }
+            fmt.println(selected_company)
+        }
+        else if selected, is_selected := selected_company.?; is_selected {
+            // set selected company's target
+
+            company := armies[selected.side].units[selected.idx]
+
+            for si, i in company.units {
+                s := troop_get(si)
+                pos := each_army_goal_pos(mouse_world, -0.2, i, len(company.units))
+                coord: Coord
+                origin := Coord(pos)
+                for {
+                    defer coord = grid.next_surrounding_cell(coord)
+
+                    cell_idx := grid.idx_safe(board, origin + coord) or_continue
+
+                    s.target = cell_center(cell_idx)
+                    break
+                }
+            }
+        }
     }
 
     move_troops: {
@@ -350,11 +374,43 @@ frame :: proc (dt: f32) -> bool {
         //     color = k2.DARK_GRAY
         // }
         pos := world_pos_to_screen(s.pos)
-        if selected_troop == si {
+        if hovered_troop == si {
             color = k2.BLUE
             size *= 2
         }
         k2.draw_circle(pos, size, color)
+    }
+
+    // selected company outline
+    if selected, is_selected := selected_company.?; is_selected {
+
+        company := armies[selected.side].units[selected.idx]
+
+        points := make([dynamic]Vec2, 0, len(company.units), allocator=context.temp_allocator)
+        for si in company.units {
+            s := troop_get(si)
+            append(&points, s.pos)
+        }
+
+        outline := convex_hull(points[:], allocator=context.temp_allocator)
+
+        if len(outline) < 3 && len(company.units) > 0 {
+            s := troop_get(company.units[0])
+            p := s.pos
+            outline = {
+                p + {+6, +3},
+                p + {-6, +3},
+                p + { 0, -3},
+            }
+        }
+
+        outline = expand_convex_polygon(outline, 2, allocator=context.allocator)
+        for i in 0..<len(outline) {
+            a, b := outline[i], outline[(i+1)%len(outline)]
+            a = world_pos_to_screen(a)
+            b = world_pos_to_screen(b)
+            k2.draw_line(a, b, 3, k2.GRAY)
+        }
     }
 
     mouse_pos := k2.get_mouse_position()
