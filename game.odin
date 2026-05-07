@@ -28,20 +28,25 @@ Army :: struct {
     side:     Army_Side,
     name:     string,
     color:    Color,
-    soldiers: []Soldier_Idx,
+    units:    []Company,
+}
+
+Company :: struct {
+    name:     string,
+    units:    []Troop_Idx,
     target:   union {vec2},
 }
 
-Soldier :: struct {
-    idx:    Soldier_Idx,
-    side:   Army_Side,
-    pos:    Vec2,
-    cell:   Maybe(int),
-    target: union {Vec2},
+Troop :: struct {
+    idx:      Troop_Idx,
+    side:     Army_Side,
+    pos:      Vec2,
+    cell:     Maybe(int),
+    target:   union {Vec2},
 }
-Soldier_Idx :: distinct u16
-Soldier_Arr :: #soa[dynamic]Soldier
-Soldier_Ptr :: #soa^Soldier_Arr
+Troop_Idx :: distinct u16
+Troop_Arr :: #soa[dynamic]Troop
+Troop_Ptr :: #soa^Troop_Arr
 
 armies: [Army_Side]Army = {
     .Player = {side=.Player, name="Player", color=k2.ORANGE},
@@ -50,12 +55,20 @@ armies: [Army_Side]Army = {
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
-soldiers: Soldier_Arr
+initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, count: int} = {
+    .Player = {
+        {"one", {30, 40}, -0.2, 200},
+        {"two", {80, 60},  0.2, 120},
+    },
+    .Enemy  = {},
+}
 
-selected_soldier: Maybe(Soldier_Idx)
+troops: Troop_Arr
+
+selected_troop: Maybe(Troop_Idx)
 
 Cell :: struct {
-    soldier: Maybe(Soldier_Idx),
+    troop: Maybe(Troop_Idx),
 }
 
 board: grid.Grid(Cell)
@@ -73,9 +86,9 @@ BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
 
-UNIT_W :: 4
-UNIT_M :: 3
-UNIT_S :: UNIT_W + UNIT_M*2
+troop_W :: 4
+troop_M :: 3
+troop_S :: troop_W + troop_M*2
 
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
@@ -109,8 +122,8 @@ cell_center :: proc (idx: int) -> (pos: Vec2) {
     return Vec2(grid.coord(board, idx)) + Vec2(0.5)
 }
 
-soldier_get :: proc (idx: Soldier_Idx) -> Soldier_Ptr {
-    return &soldiers[idx]
+troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
+    return &troops[idx]
 }
 
 army_count_dim :: proc (n: int) -> (res: [2]int) {
@@ -129,30 +142,30 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
     return
 }
 
-soldier_add_to_cell :: proc (s: Soldier_Ptr, cell_idx: int) -> (ok: bool) {
+troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: int) -> (ok: bool) {
 
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
 
-    prev_soldier, has_prev_soldier := cell.soldier.?
-    if has_prev_soldier && prev_soldier != s.idx do return
+    prev_troop, has_prev_troop := cell.troop.?
+    if has_prev_troop && prev_troop != s.idx do return
 
     if prev_idx, has_prev_idx := s.cell.?; has_prev_idx {
         prev := grid.ptr_idx(&board, prev_idx)
-        prev.soldier = nil
+        prev.troop = nil
     }
 
-    cell.soldier = s.idx
+    cell.troop = s.idx
     s.cell = cell_idx
 
     return true
 }
-soldier_set_pos :: proc (s: Soldier_Ptr, pos: Vec2) -> (ok: bool) {
+troop_set_pos :: proc (s: Troop_Ptr, pos: Vec2) -> (ok: bool) {
     cell_idx := grid_idx_from_pos(pos) or_return
-    soldier_add_to_cell(s, cell_idx) or_return
+    troop_add_to_cell(s, cell_idx) or_return
     s.pos = pos
     return true
 }
-soldier_set_pos_force :: proc (s: Soldier_Ptr, pos: Vec2) {
+troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
     cell_idx, pos_in_grid := grid_idx_from_pos(pos)
 
@@ -162,7 +175,7 @@ soldier_set_pos_force :: proc (s: Soldier_Ptr, pos: Vec2) {
         if s.cell != nil do return
         // add to any cell
         for cell, cell_idx in grid.slice(&board) {
-            if soldier_add_to_cell(s, cell_idx) {
+            if troop_add_to_cell(s, cell_idx) {
                 s.pos = cell_center(cell_idx)
                 return
             }
@@ -171,7 +184,7 @@ soldier_set_pos_force :: proc (s: Soldier_Ptr, pos: Vec2) {
     }
 
     // try adding to the cell on pos
-    if soldier_add_to_cell(s, cell_idx) {
+    if troop_add_to_cell(s, cell_idx) {
         s.pos = pos
         return
     }
@@ -183,7 +196,7 @@ soldier_set_pos_force :: proc (s: Soldier_Ptr, pos: Vec2) {
         coord = grid.next_surrounding_cell(coord)
         cell_idx = grid.idx(board, origin + coord)
 
-        if soldier_add_to_cell(s, cell_idx) {
+        if troop_add_to_cell(s, cell_idx) {
             s.pos = cell_center(cell_idx)
             return
         }
@@ -196,26 +209,32 @@ game_init :: proc () {
 
     board = grid.make(Cell, {BOARD_X, BOARD_Y})
 
-    soldiers = make(type_of(soldiers), 0, 10000, allocator=context.allocator)
+    troops = make(type_of(troops), 0, 10000, allocator=context.allocator)
 
-    army_pos  := [2]f32{10, 20}
-    army_size := 500
+    for &army in armies {
+        initials := initial_army_units[army.side]
 
-    army := army_player
+        army.units = make([]Company, len(initials))
 
-    army.soldiers = make([]Soldier_Idx, army_size, allocator=context.allocator)
+        for initial, ci in initials {
+            company := &army.units[ci]
 
-    for i in 0..<army_size {
+            company.name  = initial.name
+            company.units = make([]Troop_Idx, initial.count)
 
-        si := Soldier_Idx(len(soldiers))
-        army.soldiers[i] = si
-        append_nothing_soa(&soldiers)
+            for &si, i in company.units {
 
-        s := soldier_get(si)
-        s.idx = si
-        pos := each_army_goal_pos(army_pos + Vec2(0.5), -0.2, i, army_size)
+                si = Troop_Idx(len(troops))
+                company.units[i] = si
+                append_nothing_soa(&troops)
 
-        soldier_set_pos_force(s, pos)
+                s := troop_get(si)
+                s.idx = si
+                pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
+
+                troop_set_pos_force(s, pos)
+            }
+        }
     }
 }
 
@@ -231,7 +250,7 @@ update :: proc (dt: f32) -> bool {
     mouse_pos := k2.get_mouse_position()
     mouse_world := world_pos_from_screen(mouse_pos)
 
-    selected_soldier = nil
+    selected_troop = nil
     check_mouse_hover: {
         coord: Coord
         origin := board_coord_from_pos(mouse_world) or_break check_mouse_hover
@@ -243,9 +262,9 @@ update :: proc (dt: f32) -> bool {
             defer coord = grid.next_surrounding_cell(coord)
 
             cell := grid.get_safe(board, origin + coord) or_continue
-            si := cell.soldier.? or_continue
+            si := cell.troop.? or_continue
 
-            selected_soldier = si
+            selected_troop = si
             break
         }
     }
@@ -255,37 +274,34 @@ update :: proc (dt: f32) -> bool {
         // ignore clicks outside of the grid
         _ = grid_idx_from_pos(mouse_world) or_break check_click
 
-        army_player.target = mouse_world
-
-        for si, i in army_player.soldiers {
-            s := soldier_get(si)
-            pos := each_army_goal_pos(mouse_world, -0.2, i, len(army_player.soldiers))
-            coord: Coord
-            origin := Coord(pos)
-            for {
-                defer coord = grid.next_surrounding_cell(coord)
-
-                cell_idx := grid.idx_safe(board, origin + coord) or_continue
-
-                s.target = cell_center(cell_idx)
-                break
-            }
-        }
+        // for si, i in army_player.troops {
+        //     s := troop_get(si)
+        //     pos := each_army_goal_pos(mouse_world, -0.2, i, len(army_player.troops))
+        //     coord: Coord
+        //     origin := Coord(pos)
+        //     for {
+        //         defer coord = grid.next_surrounding_cell(coord)
+        //
+        //         cell_idx := grid.idx_safe(board, origin + coord) or_continue
+        //
+        //         s.target = cell_center(cell_idx)
+        //         break
+        //     }
+        // }
     }
 
-    move_soldiers: {
-        for army in armies {
-            for si in army.soldiers {
-                s := soldier_get(si)
-                if target, ok := s.target.(vec2); ok {
-                    d := la.normalize(target - s.pos) * dt * 0.02
-                    n := s.pos + d
-                    if !math.is_nan(n.x) &&
-                       !math.is_nan(n.y) &&
-                       !math.is_inf(n.x) &&
-                       !math.is_inf(n.y) {
-                        soldier_set_pos(s, n)
-                    }
+    move_troops: {
+        for _, i in troops {
+            troop := &troops[i]
+
+            if target, ok := troop.target.(vec2); ok {
+                d := la.normalize(target - troop.pos) * dt * 0.02
+                n := troop.pos + d
+                if !math.is_nan(n.x) &&
+                   !math.is_nan(n.y) &&
+                   !math.is_inf(n.x) &&
+                   !math.is_inf(n.y) {
+                    troop_set_pos(troop, n)
                 }
             }
         }
@@ -324,17 +340,17 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    for s, i in soldiers {
-        si := Soldier_Idx(i)
+    for s, i in troops {
+        si := Troop_Idx(i)
 
         color := army_player.color
-        size := f32(UNIT_W)
+        size := f32(troop_W)
         // color := army.color
         // if is_dead(s) {
         //     color = k2.DARK_GRAY
         // }
         pos := world_pos_to_screen(s.pos)
-        if selected_soldier == si {
+        if selected_troop == si {
             color = k2.BLUE
             size *= 2
         }
