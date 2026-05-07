@@ -7,6 +7,7 @@ import "core:math/rand"
 import k2 "./karl2d"
 import qt "./quadtree"
 import color "./color"
+import "base:runtime"
 
 Vec2  :: k2.Vec2
 Color :: k2.Color
@@ -93,23 +94,27 @@ get_grid_rect :: proc () -> (rect: Rect) {
     return
 }
 
-grid_idx_from_coord :: proc (coord: [2]int) -> int {
+grid_idx_from_coord :: proc (coord: [2]int, loc := #caller_location) -> int {
+    runtime.bounds_check_error_loc(loc, coord.x, GRID_X)
+    runtime.bounds_check_error_loc(loc, coord.y, GRID_Y)
     return coord.x + coord.y*GRID_X
+}
+grid_idx_from_coord_safe :: proc (coord: [2]int) -> (idx: int, ok: bool) {
+    return coord.x + coord.y*GRID_X,
+        coord.x >= 0 && coord.y >= 0 && coord.x < GRID_X && coord.y < GRID_Y
 }
 grid_coord_from_idx :: proc (idx: int) -> (coord: [2]int) {
     return {idx%GRID_X, idx/GRID_X}
 }
 grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
-    if pos.x < 0 ||
-       pos.y < 0 ||
-       pos.x >= grid_rect.size.x ||
-       pos.y >= grid_rect.size.y {
-        return 0, false
-    }
-    return grid_idx_from_coord(([2]int)(pos)), true
+    return grid_idx_from_coord_safe(([2]int)(pos))
 }
 grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return &grid[grid_idx_from_pos(pos) or_return], true
+}
+grid_cell_get :: proc (idx: int, loc := #caller_location) -> (cell: Cell) #no_bounds_check {
+    runtime.bounds_check_error_loc(loc, idx, len(grid))
+    return grid[idx]
 }
 grid_cell_get_safe :: proc (idx: int) -> (cell: Cell, ok: bool) {
     if in_bounds(grid, idx) {
@@ -149,8 +154,7 @@ soldier_add_to_cell :: proc (s: Soldier_Ptr, cell_idx: int) -> (ok: bool) {
     prev_soldier, has_prev_soldier := cell.soldier.?
     if has_prev_soldier && prev_soldier != s.idx do return
 
-    prev_idx, has_prev_idx := s.cell.?
-    if has_prev_idx {
+    if prev_idx, has_prev_idx := s.cell.?; has_prev_idx {
         grid[prev_idx].soldier = nil
     }
 
@@ -273,24 +277,37 @@ update :: proc (dt: f32) -> bool {
         w := d+1
         steps := w*w - 4
         for _ in 0..<steps {
-            cell, _ := grid_cell_get_safe(cell_idx)
-            if si, cell_taken := cell.soldier.?; cell_taken {
-                selected_soldier = si
-                break
-            }
-            coord = next_surrounding_cell(coord)
-            cell_idx = grid_idx_from_coord(origin + coord)
+            defer coord = next_surrounding_cell(coord)
+
+            cell_idx = grid_idx_from_coord_safe(origin + coord) or_continue
+            cell := grid_cell_get(cell_idx)
+            si := cell.soldier.? or_continue
+
+            selected_soldier = si
+            break
         }
     }
 
     check_click: if k2.mouse_button_is_held(.Left) {
+
+        // ignore clicks outside of the grid
+        _ = grid_idx_from_pos(mouse_world) or_break check_click
 
         army_player.target = mouse_world
 
         for si, i in army_player.soldiers {
             s := soldier_get(si)
             pos := each_army_goal_pos(mouse_world, -0.2, i, len(army_player.soldiers))
-            s.target = pos
+            coord: [2]int
+            origin := ([2]int)(pos)
+            for {
+                defer coord = next_surrounding_cell(coord)
+
+                cell_idx := grid_idx_from_coord_safe(origin + coord) or_continue
+
+                s.target = cell_center(cell_idx)
+                break
+            }
         }
     }
 
@@ -299,7 +316,7 @@ update :: proc (dt: f32) -> bool {
             for si in army.soldiers {
                 s := soldier_get(si)
                 if target, ok := s.target.(vec2); ok {
-                    d := la.normalize(target - s.pos) * dt * 0.0001
+                    d := la.normalize(target - s.pos) * dt * 0.02
                     n := s.pos + d
                     if !math.is_nan(n.x) &&
                        !math.is_nan(n.y) &&
