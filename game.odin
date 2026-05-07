@@ -36,23 +36,29 @@ Company :: struct {
     units:    []Troop_Idx,
     target:   union {vec2},
 }
+Company_Idx :: distinct u16
+
+Company_Handle :: struct {
+    side: Army_Side,
+    idx:  Company_Idx,
+}
 
 Troop :: struct {
     side:     Army_Side,
     si:       Troop_Idx,
-    ci:       int,
+    ci:       Company_Idx,
     pos:      Vec2,
-    cell:     Maybe(int),
+    cell:     Maybe(Cell_Idx),
     target:   union {Vec2},
 }
 Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
 
-Company_Handle :: struct {
-    side: Army_Side,
-    idx:  int,
+Cell :: struct {
+    troop: Maybe(Troop_Idx),
 }
+Cell_Idx :: distinct u16
 
 armies: [Army_Side]Army = {
     .Player = {side=.Player, name="Player", color=k2.ORANGE},
@@ -73,10 +79,6 @@ troops: Troop_Arr
 
 hovered_troop: Maybe(Troop_Idx)
 selected_company: Maybe(Company_Handle)
-
-Cell :: struct {
-    troop: Maybe(Troop_Idx),
-}
 
 board: grid.Grid(Cell)
 
@@ -118,14 +120,14 @@ get_board_rect :: proc () -> (rect: Rect) {
 board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) {
     return Coord(pos), grid.inside(board, Coord(pos))
 }
-grid_idx_from_pos :: proc (pos: Vec2) -> (idx: int, ok: bool) {
+grid_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) {
     c := Coord(pos)
-    return grid.idx(board, c), grid.inside(board, c)
+    return Cell_Idx(grid.idx(board, c)), grid.inside(board, c)
 }
 grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return grid.ptr_safe(&board, Coord(pos))
 }
-cell_center :: proc (idx: int) -> (pos: Vec2) {
+cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
     return Vec2(grid.coord(board, idx)) + Vec2(0.5)
 }
 
@@ -149,7 +151,7 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
     return
 }
 
-troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: int) -> (ok: bool) {
+troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
 
@@ -182,8 +184,8 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
         if s.cell != nil do return
         // add to any cell
         for cell, cell_idx in grid.slice(&board) {
-            if troop_add_to_cell(s, cell_idx) {
-                s.pos = cell_center(cell_idx)
+            if troop_add_to_cell(s, Cell_Idx(cell_idx)) {
+                s.pos = cell_center(Cell_Idx(cell_idx))
                 return
             }
         }
@@ -201,7 +203,7 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
     coord: Coord
     for {
         coord = grid.next_surrounding_cell(coord)
-        cell_idx = grid.idx(board, origin + coord)
+        cell_idx = Cell_Idx(grid.idx(board, origin + coord))
 
         if troop_add_to_cell(s, cell_idx) {
             s.pos = cell_center(cell_idx)
@@ -223,7 +225,8 @@ game_init :: proc () {
 
         army.units = make([]Company, len(initials))
 
-        for initial, ci in initials {
+        for initial, ci_int in initials {
+            ci := Company_Idx(ci_int)
             company := &army.units[ci]
 
             company.name  = initial.name
@@ -305,7 +308,7 @@ update :: proc (dt: f32) -> bool {
                 for {
                     defer coord = grid.next_surrounding_cell(coord)
 
-                    cell_idx := grid.idx_safe(board, origin + coord) or_continue
+                    cell_idx := Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
 
                     s.target = cell_center(cell_idx)
                     break
