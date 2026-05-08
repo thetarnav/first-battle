@@ -1,5 +1,6 @@
 package first_battle
 
+import "core:time"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -54,6 +55,7 @@ Troop :: struct {
     pathfinding: struct {
         target:    union {Cell_Idx},
         path:      [dynamic]Coord,
+        prefer:    enum {Target, Path},
         time_left: f32,
     },
 }
@@ -127,11 +129,16 @@ board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) #optional_o
     return Coord(pos), grid.inside(board, Coord(pos))
 }
 grid_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) #optional_ok {
-    c := Coord(pos)
-    return Cell_Idx(grid.idx(board, c)), grid.inside(board, c)
+    return cell_idx(Coord(pos)), grid.inside(board, Coord(pos))
 }
 grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return grid.ptr_safe(&board, Coord(pos))
+}
+cell_coord :: proc (idx: Cell_Idx) -> (coord: Coord) {
+    return grid.coord(board, idx)
+}
+cell_idx :: proc (coord: Coord) -> (idx: Cell_Idx) {
+    return Cell_Idx(grid.idx(board, coord))
 }
 cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
     return Vec2(grid.coord(board, idx)) + Vec2(0.5)
@@ -191,10 +198,37 @@ troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
         cell_idx = grid_idx_from_pos(troop.pos)
         pos := rect_clamp_point_exclusive(cell_rect(cell_idx), pos)
         assert(cell_idx == grid_idx_from_pos(pos))
+        if troop.pos == pos {
+            return false // cannot move further
+        }
         troop.pos = pos
     }
 
     return true
+}
+troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: bool) {
+
+    s_idx, _ := grid_idx_from_pos(troop.pos)
+
+    s_coord := cell_coord(s_idx)
+    e_coord := cell_coord(e_idx)
+
+    s_pos := troop.pos
+    e_pos := Vec2(e_coord) + Vec2(0.5)
+
+    // end
+    if distance(s_pos, e_pos) < 0.01 && s_coord == e_coord {
+        troop.pos = e_pos
+        return true
+    }
+
+    d := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
+    n := troop.pos + (d * dt * 0.02)
+    if la.is_nan(n) != false {
+        return false
+    }
+
+    return troop_set_pos(troop, n)
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
@@ -346,55 +380,66 @@ update :: proc (dt: f32) -> bool {
         }
     }
 
-    pathfinding: {
-
-        // make walls (occupied cells) from the board
-        walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
-        for cell, i in grid.slice(&board) {
-            walls.data[i] = cell.troop != nil
-        }
-
-        for _, i in troops {
-            troop := &troops[i]
-
-            // only update path every now and than
-            troop.pathfinding.time_left -= dt
-            if troop.pathfinding.time_left > 0 do continue
-            troop.pathfinding.time_left = rand.float32_range(100, 600)
-
-            clear(&troop.pathfinding.path)
-
-            target := troop.pathfinding.target.(Cell_Idx) or_continue
-
-            start := board_coord_from_pos(troop.pos) or_continue
-            end   := grid.coord(board, target)
-
-            astar.astar(&troop.pathfinding.path, walls,  start, end, allocator=context.temp_allocator)
-        }
+    // make walls (occupied cells) from the board
+    walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
+    for cell, i in grid.slice(&board) {
+        walls.data[i] = cell.troop != nil
     }
 
-    move_troops: {
-        for _, i in troops {
-            troop := &troops[i]
+    move_troops:
+    for _, i in troops {
+        troop := &troops[i]
 
-            coord := len(troop.pathfinding.path) > 0 ? \
-                troop.pathfinding.path[0] : \
-                Coord(troop.pos)
+        troop.pathfinding.time_left -= dt
+        time_to_update_path := troop.pathfinding.time_left <= 0
+        if time_to_update_path {
+            troop.pathfinding.time_left = rand.float32_range(400, 1000)
+        }
 
-            s := troop.pos
-            e := Vec2(coord) + Vec2(0.5)
-            if distance(s, e) < 0.01 do continue
+        target, has_target := troop.pathfinding.target.(Cell_Idx)
+        target_coord := cell_coord(target)
+        troop_coord := board_coord_from_pos(troop.pos)
+        troop_cell_idx := cell_idx(troop_coord)
 
-            d := la.min(la.normalize(e-s), e-s) * dt * 0.02
-            n := troop.pos + d
-            if la.is_nan(n) != false do continue
+        direct:
+        if has_target && (time_to_update_path || troop.pathfinding.prefer == .Target) {
+            // try moving towards the target directly
+            troop.pathfinding.prefer = .Target
+            if troop_move_towards(troop, target, dt) do continue
+        }
 
-            troop_set_pos(troop, n) or_continue
+        pathfind:
+        if has_target && target_coord != troop_coord &&
+           (time_to_update_path || troop.pathfinding.prefer == .Target)
+        {
+            troop.pathfinding.prefer = .Target
+            clear(&troop.pathfinding.path)
 
-            if Coord(troop.pos) == coord && len(troop.pathfinding.path) > 0 {
-                pop_front(&troop.pathfinding.path)
+            astar.astar(&troop.pathfinding.path, walls, troop_coord, target_coord, allocator=context.temp_allocator)
+
+            if len(troop.pathfinding.path) > 0 {
+                troop.pathfinding.prefer = .Path
             }
         }
+
+        by_path:
+        if troop.pathfinding.prefer == .Path {
+            if len(troop.pathfinding.path) == 0 {
+                troop.pathfinding.prefer = .Target
+                break by_path
+            }
+
+            next := troop.pathfinding.path[0]
+            next_idx := cell_idx(next)
+
+            if troop_coord == next {
+                pop_front(&troop.pathfinding.path)
+            }
+
+            if troop_move_towards(troop, next_idx, dt) do continue
+        }
+
+        // troop_move_towards(troop, troop_cell_idx, dt)
     }
 
     if k2.key_went_down(.Q) {
