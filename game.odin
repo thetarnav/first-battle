@@ -123,10 +123,10 @@ get_board_rect :: proc () -> (rect: Rect) {
     return
 }
 
-board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) {
+board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) #optional_ok {
     return Coord(pos), grid.inside(board, Coord(pos))
 }
-grid_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) {
+grid_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) #optional_ok {
     c := Coord(pos)
     return Cell_Idx(grid.idx(board, c)), grid.inside(board, c)
 }
@@ -135,6 +135,9 @@ grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
 }
 cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
     return Vec2(grid.coord(board, idx)) + Vec2(0.5)
+}
+cell_rect :: proc (idx: Cell_Idx) -> (rect: Rect) {
+    return {Vec2(grid.coord(board, idx)), 1}
 }
 
 troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
@@ -176,10 +179,21 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     cell.troop = s.si
     return true
 }
-troop_set_pos :: proc (s: Troop_Ptr, pos: Vec2) -> (ok: bool) {
+troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
+
     cell_idx := grid_idx_from_pos(pos) or_return
-    troop_add_to_cell(s, cell_idx) or_return
-    s.pos = pos
+
+    if troop_add_to_cell(troop, cell_idx) {
+        // added to next cell (or same)
+        troop.pos = pos
+    } else {
+        // move in current cell up to the cell border
+        cell_idx = grid_idx_from_pos(troop.pos)
+        pos := rect_clamp_point_exclusive(cell_rect(cell_idx), pos)
+        assert(cell_idx == grid_idx_from_pos(pos))
+        troop.pos = pos
+    }
+
     return true
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
@@ -398,6 +412,14 @@ frame :: proc (dt: f32) -> bool {
     wc := window_size/2
 
     draw_cross(wc, k2.DARK_GRAY)
+
+    for c, i in grid.slice(&board) {
+        if c.troop != nil {
+            s := world_pos_to_screen(Vec2(grid.coord(board, i)))
+            w := board_rect.size/BOARD_SIZE
+            k2.draw_rect({x=s.x, y=s.y, w=w.x, h=w.y}, k2.LIGHT_GRAY)
+        }
+    }
 
     {
         for xi in 0..=BOARD_X {

@@ -458,6 +458,20 @@ rect_union :: proc (a, b: Rect) -> Rect {
 
 	return {min, max-min}
 }
+// [rect.pos, point, rect.pos + rect.size]
+rect_clamp_point :: proc(r: Rect, p: vec2) -> vec2 {
+	return {
+		clamp(p.x, r.x, r.x + r.size.x),
+		clamp(p.y, r.y, r.y + r.size.y),
+	}
+}
+// [rect.pos, point, rect.pos + rect.size)
+rect_clamp_point_exclusive :: proc(r: Rect, p: vec2) -> vec2 {
+	return {
+		clamp(p.x, r.x, math.nextafter(r.x + r.size.x, r.x)),
+		clamp(p.y, r.y, math.nextafter(r.y + r.size.y, r.y)),
+	}
+}
 
 correct_extents :: proc (
 	positions: []vec3,
