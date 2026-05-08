@@ -45,12 +45,17 @@ Company_Handle :: struct {
 }
 
 Troop :: struct {
-    side:     Army_Side,
     si:       Troop_Idx,
+    side:     Army_Side,
     ci:       Company_Idx,
+
     pos:      Vec2,
-    cell:     Maybe(Cell_Idx),
-    target:   union {Cell_Idx},
+
+    pathfinding: struct {
+        target:    union {Cell_Idx},
+        path:      [dynamic]Coord,
+        time_left: f32,
+    },
 }
 Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
@@ -156,17 +161,19 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
 
-    prev_troop, has_prev_troop := cell.troop.?
-    if has_prev_troop && prev_troop != s.si do return
+    // cell taken
+    if prev_troop, cell_has_prev_troop := cell.troop.?;
+       cell_has_prev_troop && prev_troop != s.si {
+        return false
+    }
 
-    if prev_idx, has_prev_idx := s.cell.?; has_prev_idx {
-        prev := grid.ptr_idx(&board, prev_idx)
-        prev.troop = nil
+    // remove troop from it's current cell
+    if prev_cell, has_prev_cell := grid_cell_from_pos(s.pos);
+       has_prev_cell && prev_cell.troop == s.si {
+        prev_cell.troop = nil
     }
 
     cell.troop = s.si
-    s.cell = cell_idx
-
     return true
 }
 troop_set_pos :: proc (s: Troop_Ptr, pos: Vec2) -> (ok: bool) {
@@ -182,7 +189,12 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
     // pos outside of the grid - pick any cell
     if !pos_in_grid {
         fmt.printfln("tried to set position outside of the grid: %v", pos)
-        if s.cell != nil do return
+
+        if prev_cell, has_prev_cell := grid_cell_from_pos(s.pos);
+           has_prev_cell && prev_cell.troop == s.si {
+            return // already in a cell
+        }
+
         // add to any cell
         for cell, cell_idx in grid.slice(&board) {
             if troop_add_to_cell(s, Cell_Idx(cell_idx)) {
@@ -221,11 +233,13 @@ game_init :: proc () {
 
     troops = make(type_of(troops), 0, 10000, allocator=context.allocator)
 
+    // each army
     for &army in armies {
         initials := initial_army_units[army.side]
 
         army.units = make([]Company, len(initials))
 
+        // each company
         for initial, ci_int in initials {
             ci := Company_Idx(ci_int)
             company := &army.units[ci]
@@ -233,6 +247,7 @@ game_init :: proc () {
             company.name  = initial.name
             company.units = make([]Troop_Idx, initial.count)
 
+            // each troop
             for &si, i in company.units {
 
                 si = Troop_Idx(len(troops))
@@ -245,6 +260,8 @@ game_init :: proc () {
 
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
+
+                s.pathfinding.path = make(type_of(s.pathfinding.path))
             }
         }
     }
@@ -308,15 +325,16 @@ update :: proc (dt: f32) -> bool {
                 for {
                     defer coord = grid.next_surrounding_cell(coord)
 
-                    s.target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
+                    s.pathfinding.target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
                     break
                 }
             }
         }
     }
 
-    move_troops: {
+    pathfinding: {
 
+        // make walls (occupied cells) from the board
         walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
         for cell, i in grid.slice(&board) {
             walls.data[i] = cell.troop != nil
@@ -325,29 +343,42 @@ update :: proc (dt: f32) -> bool {
         for _, i in troops {
             troop := &troops[i]
 
-            path := make([dynamic]grid.Coord, allocator=context.temp_allocator)
+            // only update path every now and than
+            troop.pathfinding.time_left -= dt
+            if troop.pathfinding.time_left > 0 do continue
+            troop.pathfinding.time_left = rand.float32_range(100, 600)
 
-            if target, ok := troop.target.(Cell_Idx); ok {
+            clear(&troop.pathfinding.path)
 
-                start := board_coord_from_pos(troop.pos) or_continue
-                end   := grid.coord(board, target)
+            target := troop.pathfinding.target.(Cell_Idx) or_continue
 
-                clear(&path)
-                astar.astar(&path, walls,  start, end, allocator=context.temp_allocator)
+            start := board_coord_from_pos(troop.pos) or_continue
+            end   := grid.coord(board, target)
 
-                if len(path) == 0 do continue
+            astar.astar(&troop.pathfinding.path, walls,  start, end, allocator=context.temp_allocator)
+        }
+    }
 
-                coord := path[0]
-                assert(coord != start)
+    move_troops: {
+        for _, i in troops {
+            troop := &troops[i]
 
-                d := la.normalize(Vec2(coord) + Vec2(0.5) - troop.pos) * dt * 0.02
-                n := troop.pos + d
-                if !math.is_nan(n.x) &&
-                   !math.is_nan(n.y) &&
-                   !math.is_inf(n.x) &&
-                   !math.is_inf(n.y) {
-                    troop_set_pos(troop, n)
-                }
+            coord := len(troop.pathfinding.path) > 0 ? \
+                troop.pathfinding.path[0] : \
+                Coord(troop.pos)
+
+            s := troop.pos
+            e := Vec2(coord) + Vec2(0.5)
+            if distance(s, e) < 0.01 do continue
+
+            d := la.min(la.normalize(e-s), e-s) * dt * 0.02
+            n := troop.pos + d
+            if la.is_nan(n) != false do continue
+
+            troop_set_pos(troop, n) or_continue
+
+            if Coord(troop.pos) == coord && len(troop.pathfinding.path) > 0 {
+                pop_front(&troop.pathfinding.path)
             }
         }
     }
