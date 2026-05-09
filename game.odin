@@ -52,7 +52,7 @@ Troop :: struct {
 
     pos:      Vec2,
 
-    pathfinding: struct {
+    movement: struct {
         next_target: union {Cell_Idx},
         target:      union {Cell_Idx},
         path:        [dynamic]Coord,
@@ -310,7 +310,7 @@ game_init :: proc () {
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
 
-                s.pathfinding.path = make(type_of(s.pathfinding.path))
+                s.movement.path = make(type_of(s.movement.path))
             }
         }
     }
@@ -374,7 +374,7 @@ update :: proc (dt: f32) -> bool {
                 for {
                     defer coord = grid.next_surrounding_cell(coord)
 
-                    s.pathfinding.next_target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
+                    s.movement.next_target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
                     break
                 }
             }
@@ -391,26 +391,26 @@ update :: proc (dt: f32) -> bool {
     for _, i in troops {
         troop := &troops[i]
 
-        troop.pathfinding.time_left -= dt
-        time_to_update := troop.pathfinding.time_left <= 0
+        troop.movement.time_left -= dt
+        time_to_update := troop.movement.time_left <= 0
         if time_to_update {
-            troop.pathfinding.time_left = rand.float32_range(200, 600)
+            troop.movement.time_left = rand.float32_range(200, 600)
         }
 
         if time_to_update {
-            troop.pathfinding.target = troop.pathfinding.next_target
+            troop.movement.target = troop.movement.next_target
         }
 
-        target, has_target := troop.pathfinding.target.(Cell_Idx)
+        target, has_target := troop.movement.target.(Cell_Idx)
         target_coord := cell_coord(target)
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
 
         direct:
-        if has_target && (time_to_update || troop.pathfinding.prefer == .Target) {
+        if has_target && (time_to_update || troop.movement.prefer == .Target) {
             // try moving towards the target directly
 
-            troop.pathfinding.prefer = .Target
+            troop.movement.prefer = .Target
             if troop_move_towards(troop, target, dt) do continue
         }
 
@@ -418,30 +418,30 @@ update :: proc (dt: f32) -> bool {
         if has_target && target_coord != troop_coord && time_to_update {
             // find a path to the target id cannot move directly
 
-            troop.pathfinding.prefer = .Target
-            clear(&troop.pathfinding.path)
+            troop.movement.prefer = .Target
+            clear(&troop.movement.path)
 
-            astar.astar(&troop.pathfinding.path, walls, troop_coord, target_coord, allocator=context.temp_allocator)
+            astar.astar(&troop.movement.path, walls, troop_coord, target_coord, allocator=context.temp_allocator)
 
-            if len(troop.pathfinding.path) > 0 {
-                troop.pathfinding.prefer = .Path
+            if len(troop.movement.path) > 0 {
+                troop.movement.prefer = .Path
             }
         }
 
         by_path:
-        if troop.pathfinding.prefer == .Path {
+        if troop.movement.prefer == .Path {
             // try moving using the path
 
-            if len(troop.pathfinding.path) == 0 {
-                troop.pathfinding.prefer = .Target
+            if len(troop.movement.path) == 0 {
+                troop.movement.prefer = .Target
                 break by_path
             }
 
-            next := troop.pathfinding.path[0]
+            next := troop.movement.path[0]
             next_idx := cell_idx(next)
 
             if troop_coord == next {
-                pop_front(&troop.pathfinding.path)
+                pop_front(&troop.movement.path)
             }
 
             if troop_move_towards(troop, next_idx, dt) do continue
