@@ -53,10 +53,11 @@ Troop :: struct {
     pos:      Vec2,
 
     pathfinding: struct {
-        target:    union {Cell_Idx},
-        path:      [dynamic]Coord,
-        prefer:    enum {Target, Path},
-        time_left: f32,
+        next_target: union {Cell_Idx},
+        target:      union {Cell_Idx},
+        path:        [dynamic]Coord,
+        prefer:      enum {Target, Path},
+        time_left:   f32,
     },
 }
 Troop_Idx :: distinct u16
@@ -373,7 +374,7 @@ update :: proc (dt: f32) -> bool {
                 for {
                     defer coord = grid.next_surrounding_cell(coord)
 
-                    s.pathfinding.target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
+                    s.pathfinding.next_target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
                     break
                 }
             }
@@ -391,9 +392,13 @@ update :: proc (dt: f32) -> bool {
         troop := &troops[i]
 
         troop.pathfinding.time_left -= dt
-        time_to_update_path := troop.pathfinding.time_left <= 0
-        if time_to_update_path {
-            troop.pathfinding.time_left = rand.float32_range(400, 1000)
+        time_to_update := troop.pathfinding.time_left <= 0
+        if time_to_update {
+            troop.pathfinding.time_left = rand.float32_range(200, 600)
+        }
+
+        if time_to_update {
+            troop.pathfinding.target = troop.pathfinding.next_target
         }
 
         target, has_target := troop.pathfinding.target.(Cell_Idx)
@@ -402,16 +407,17 @@ update :: proc (dt: f32) -> bool {
         troop_cell_idx := cell_idx(troop_coord)
 
         direct:
-        if has_target && (time_to_update_path || troop.pathfinding.prefer == .Target) {
+        if has_target && (time_to_update || troop.pathfinding.prefer == .Target) {
             // try moving towards the target directly
+
             troop.pathfinding.prefer = .Target
             if troop_move_towards(troop, target, dt) do continue
         }
 
         pathfind:
-        if has_target && target_coord != troop_coord &&
-           (time_to_update_path || troop.pathfinding.prefer == .Target)
-        {
+        if has_target && target_coord != troop_coord && time_to_update {
+            // find a path to the target id cannot move directly
+
             troop.pathfinding.prefer = .Target
             clear(&troop.pathfinding.path)
 
@@ -424,6 +430,8 @@ update :: proc (dt: f32) -> bool {
 
         by_path:
         if troop.pathfinding.prefer == .Path {
+            // try moving using the path
+
             if len(troop.pathfinding.path) == 0 {
                 troop.pathfinding.prefer = .Target
                 break by_path
