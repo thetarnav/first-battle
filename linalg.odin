@@ -35,6 +35,11 @@ Rect :: struct {
 }
 AABB :: Rect
 
+Rect_Int :: struct {
+	using pos: [2]int,
+	size:      [2]int,
+}
+
 TAU     :: la.TAU
 PI      :: la.PI
 HALF_PI :: la.PI / 2
@@ -401,7 +406,7 @@ normals_from_positions :: proc (dst, src: []vec3) #no_bounds_check {
 }
 
 @require_results
-get_extents :: proc (positions: []vec3) -> (v_min, v_max: vec3) #no_bounds_check {
+vec3_extents :: proc (positions: []vec3) -> (v_min, v_max: vec3) #no_bounds_check {
 
 	if len(positions) > 0 {
 		v_min = positions[0]
@@ -420,12 +425,13 @@ get_extents :: proc (positions: []vec3) -> (v_min, v_max: vec3) #no_bounds_check
 	return
 }
 
-extend_extents :: proc (v_min, v_max: ^vec3, positions: []vec3) {
-	p_min, p_max := get_extents(positions)
-	v_min^, v_max^ = get_extents({v_min^, v_max^, p_min, p_max})
+vec3_extents_extend :: proc (v_min, v_max: ^vec3, positions: []vec3) {
+	p_min, p_max := vec3_extents(positions)
+	v_min^, v_max^ = vec3_extents({v_min^, v_max^, p_min, p_max})
 }
 
-points_bounds :: proc (points: []vec2) -> Rect #no_bounds_check {
+@require_results
+vec2_bounds :: proc "contextless" (points: []vec2) -> Rect #no_bounds_check {
 
 	if len(points) == 0 do return {}
 
@@ -439,7 +445,9 @@ points_bounds :: proc (points: []vec2) -> Rect #no_bounds_check {
 
 	return {min, max-min}
 }
-rect_to_points :: proc (r: Rect) -> [4]vec2 {
+vec2_extents :: vec2_bounds
+@require_results
+rect_to_points :: proc "contextless" (r: Rect) -> [4]vec2 {
 	return {
 		r.pos,
 		{r.pos.x + r.size.x, r.pos.y},
@@ -447,30 +455,80 @@ rect_to_points :: proc (r: Rect) -> [4]vec2 {
 		{r.pos.x, r.pos.y + r.size.y},
 	}
 }
-rect_transform :: proc (r: Rect, m: mat3) -> Rect {
+@require_results
+rect :: #force_inline proc "contextless" (s, e: vec2) -> Rect {
+    return {s, e-s}
+}
+@require_results
+rect_transform :: proc "contextless" (r: Rect, m: mat3) -> Rect {
 	points := rect_to_points(r)
 	vec2_arr_transform(points[:], m)
-	return points_bounds(points[:])
+	return vec2_bounds(points[:])
 }
-rect_union :: proc (a, b: Rect) -> Rect {
+@require_results
+rect_union :: proc "contextless" (a, b: Rect) -> Rect {
 	min := la.min(a.pos, b.pos)
 	max := la.max(a.pos + a.size, b.pos + b.size)
 
 	return {min, max-min}
 }
+@require_results
+rect_clamp :: proc "contextless" (v, m: Rect) -> Rect {
+    s := la.max(v.pos, m.pos)
+    e := la.min(v.pos+v.size, m.pos+m.size)
+    return rect(la.max(v.pos, m.pos), la.min(v.pos+v.size, m.pos+m.size))
+}
 // [rect.pos, point, rect.pos + rect.size]
-rect_clamp_point :: proc(r: Rect, p: vec2) -> vec2 {
-	return {
-		clamp(p.x, r.x, r.x + r.size.x),
-		clamp(p.y, r.y, r.y + r.size.y),
-	}
+@require_results
+rect_clamp_point :: proc "contextless" (r: Rect, p: vec2) -> vec2 {
+	return la.clamp(p, r, r + r.size)
 }
 // [rect.pos, point, rect.pos + rect.size)
-rect_clamp_point_exclusive :: proc(r: Rect, p: vec2) -> vec2 {
+@require_results
+rect_clamp_point_exclusive :: proc "contextless" (r: Rect, p: vec2) -> vec2 {
 	return {
 		clamp(p.x, r.x, math.nextafter(r.x + r.size.x, r.x)),
 		clamp(p.y, r.y, math.nextafter(r.y + r.size.y, r.y)),
 	}
+}
+@require_results
+rect_extend :: proc "contextless" (rect: Rect, by: vec2) -> Rect {
+    return {rect.pos - by, rect.size + by*2}
+}
+
+// TODO: could just make Rect generic
+@require_results
+rect_int :: #force_inline proc "contextless" (s, e: [2]int) -> Rect_Int {
+    return {s, e-s}
+}
+@require_results
+rect_int_clamp :: proc "contextless" (v, m: Rect_Int) -> Rect_Int {
+    s := la.max(v.pos, m.pos)
+    e := la.min(v.pos+v.size, m.pos+m.size)
+    return rect_int(la.max(v.pos, m.pos), la.min(v.pos+v.size, m.pos+m.size))
+}
+@require_results
+rect_int_clamp_point :: proc "contextless" (r: Rect_Int, p: [2]int) -> [2]int {
+	return la.clamp(p, r, r + r.size)
+}
+@require_results
+rect_int_extend :: proc "contextless" (rect: Rect_Int, by: [2]int) -> Rect_Int {
+    return {rect.pos - by, rect.size + by*2}
+}
+@require_results
+rect_int_from_points :: proc "contextless" (points: [][2]int) -> Rect_Int #no_bounds_check {
+
+	if len(points) == 0 do return {}
+
+	min := points[0]
+	max := points[0]
+
+	for p in points[1:] {
+		min = la.min(min, p)
+		max = la.max(max, p)
+	}
+
+	return {min, max-min}
 }
 
 correct_extents :: proc (

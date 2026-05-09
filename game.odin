@@ -424,19 +424,16 @@ update :: proc (dt: f32) -> bool {
 
             path := make([dynamic]Coord, allocator=context.temp_allocator)
 
-            board_path_pos := troop_coord
-            board_path_end := target_coord
+            slice_rect := rect_int_from_points({troop_coord, target_coord})
+            slice_rect  = rect_int_extend(slice_rect, 10)
+            slice_rect  = rect_int_clamp(slice_rect, {0, board.size})
 
-            slice_m   := 10
-            slice_pos := la.max(la.min(board_path_pos, board_path_end) - slice_m, 0)
-            slice_end := la.min(la.max(board_path_pos, board_path_end) + slice_m, Coord(board.size))
+            slice_path_pos := troop_coord  - slice_rect
+            slice_path_end := target_coord - slice_rect
 
-            slice_path_pos := board_path_pos-slice_pos
-            slice_path_end := board_path_end-slice_pos
-
-            walls := grid.make_empty(bool, slice_end-slice_pos)
+            walls := grid.make_empty(bool, slice_rect.size)
             for &w, i in grid.slice(walls) {
-                board_coord := grid.coord(walls, i) + slice_pos
+                board_coord := grid.coord(walls, i) + slice_rect
                 cell := grid.get(board, board_coord)
                 w = cell.troop != nil
             }
@@ -444,7 +441,7 @@ update :: proc (dt: f32) -> bool {
             if astar.astar(&path, walls, slice_path_pos, slice_path_end, allocator=context.temp_allocator) {
                 resize(&troop.movement.path, len(path))
                 for &p, i in troop.movement.path {
-                    p = cell_idx(path[i] + slice_pos)
+                    p = cell_idx(path[i] + slice_rect)
                 }
                 troop.movement.prefer = .Path
             }
