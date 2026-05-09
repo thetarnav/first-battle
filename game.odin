@@ -130,11 +130,14 @@ get_board_rect :: proc () -> (rect: Rect) {
 board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) #optional_ok {
     return Coord(pos), grid.inside(board, Coord(pos))
 }
-grid_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) #optional_ok {
+cell_idx_from_pos :: proc (pos: Vec2) -> (idx: Cell_Idx, ok: bool) #optional_ok {
     return cell_idx(Coord(pos)), grid.inside(board, Coord(pos))
 }
-grid_cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
+cell_from_pos :: proc (pos: Vec2) -> (cell: ^Cell, ok: bool) {
     return grid.ptr_safe(&board, Coord(pos))
+}
+cell_get :: proc (idx: Cell_Idx) -> (cell: ^Cell) {
+    return grid.ptr_idx(&board, idx)
 }
 cell_coord :: proc (idx: Cell_Idx) -> (coord: Coord) {
     return grid.coord(board, idx)
@@ -180,7 +183,7 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     }
 
     // remove troop from it's current cell
-    if prev_cell, has_prev_cell := grid_cell_from_pos(s.pos);
+    if prev_cell, has_prev_cell := cell_from_pos(s.pos);
        has_prev_cell && prev_cell.troop == s.si {
         prev_cell.troop = nil
     }
@@ -190,16 +193,16 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 }
 troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
 
-    cell_idx := grid_idx_from_pos(pos) or_return
+    cell_idx := cell_idx_from_pos(pos) or_return
 
     if troop_add_to_cell(troop, cell_idx) {
         // added to next cell (or same)
         troop.pos = pos
     } else {
         // move in current cell up to the cell border
-        cell_idx = grid_idx_from_pos(troop.pos)
+        cell_idx = cell_idx_from_pos(troop.pos)
         pos := rect_clamp_point_exclusive(cell_rect(cell_idx), pos)
-        assert(cell_idx == grid_idx_from_pos(pos))
+        assert(cell_idx == cell_idx_from_pos(pos))
         if troop.pos == pos {
             return false // cannot move further
         }
@@ -210,7 +213,7 @@ troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
 }
 troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: bool) {
 
-    s_idx, _ := grid_idx_from_pos(troop.pos)
+    s_idx, _ := cell_idx_from_pos(troop.pos)
 
     s_coord := cell_coord(s_idx)
     e_coord := cell_coord(e_idx)
@@ -234,13 +237,13 @@ troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: 
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
-    cell_idx, pos_in_grid := grid_idx_from_pos(pos)
+    cell_idx, pos_in_grid := cell_idx_from_pos(pos)
 
     // pos outside of the grid - pick any cell
     if !pos_in_grid {
         fmt.printfln("tried to set position outside of the grid: %v", pos)
 
-        if prev_cell, has_prev_cell := grid_cell_from_pos(s.pos);
+        if prev_cell, has_prev_cell := cell_from_pos(s.pos);
            has_prev_cell && prev_cell.troop == s.si {
             return // already in a cell
         }
@@ -351,7 +354,7 @@ update :: proc (dt: f32) -> bool {
     check_click: if k2.mouse_button_is_held(.Left) {
 
         // ignore clicks outside of the grid
-        _ = grid_idx_from_pos(mouse_world) or_break check_click
+        _ = cell_idx_from_pos(mouse_world) or_break check_click
 
         if si, hovering_troop := hovered_troop.?; hovering_troop {
             // select company
@@ -408,8 +411,14 @@ update :: proc (dt: f32) -> bool {
         troop_cell_idx := cell_idx(troop_coord)
 
         direct:
-        if has_target && (time_to_update || troop.movement.prefer == .Target) {
+        if has_target && target_coord != troop_coord &&
+           (time_to_update || troop.movement.prefer == .Target) {
             // try moving towards the target directly
+
+            next := troop_coord + la.sign(target_coord-troop_coord)
+            next_idx := cell_idx(next)
+            next_cell := cell_get(next_idx)
+            if next_cell.troop != nil do break direct
 
             troop.movement.prefer = .Target
             if troop_move_towards(troop, target, dt) do continue
@@ -419,17 +428,16 @@ update :: proc (dt: f32) -> bool {
         if has_target && target_coord != troop_coord && time_to_update {
             // find a path to the target id cannot move directly
 
+            target_cell := cell_get(target)
+            if target_cell.troop != nil do break pathfind
+
             troop.movement.prefer = .Target
             clear(&troop.movement.path)
 
-            path := make([dynamic]Coord, allocator=context.temp_allocator)
-
+            // pathfind in a limited fragment of the board
             slice_rect := rect_int_from_points({troop_coord, target_coord})
             slice_rect  = rect_int_extend(slice_rect, 10)
             slice_rect  = rect_int_clamp(slice_rect, {0, board.size})
-
-            slice_path_pos := troop_coord  - slice_rect
-            slice_path_end := target_coord - slice_rect
 
             walls := grid.make_empty(bool, slice_rect.size)
             for &w, i in grid.slice(walls) {
@@ -438,7 +446,8 @@ update :: proc (dt: f32) -> bool {
                 w = cell.troop != nil
             }
 
-            if astar.astar(&path, walls, slice_path_pos, slice_path_end, allocator=context.temp_allocator) {
+            path := make([dynamic]Coord, allocator=context.temp_allocator)
+            if astar.astar(&path, walls, troop_coord-slice_rect, target_coord-slice_rect, allocator=context.temp_allocator) {
                 resize(&troop.movement.path, len(path))
                 for &p, i in troop.movement.path {
                     p = cell_idx(path[i] + slice_rect)
@@ -465,7 +474,7 @@ update :: proc (dt: f32) -> bool {
             if troop_move_towards(troop, next, dt) do continue
         }
 
-        // troop_move_towards(troop, troop_cell_idx, dt)
+        troop_move_towards(troop, troop_cell_idx, dt)
     }
 
     if k2.key_went_down(.Q) {
