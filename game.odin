@@ -37,7 +37,7 @@ Army :: struct {
 Company :: struct {
     name:     string,
     units:    []Troop_Idx,
-    // target:   union {vec2},
+    target:   union {Cell_Idx},
 }
 Company_Idx :: distinct u16
 
@@ -47,14 +47,17 @@ Company_Handle :: struct {
 }
 
 Troop :: struct {
-    si:       Troop_Idx,
-    side:     Army_Side,
-    ci:       Company_Idx,
+
+    info: struct {
+        si:       Troop_Idx,
+        side:     Army_Side,
+        ci:       Company_Idx,
+        ui:       int,
+    },
 
     pos:      Vec2,
 
     movement: struct {
-        next_target: union {Cell_Idx},
         target:      union {Cell_Idx},
         path:        [dynamic]Cell_Idx,
         prefer:      enum {Target, Path},
@@ -145,6 +148,9 @@ cell_coord :: proc (idx: Cell_Idx) -> (coord: Coord) {
 cell_idx :: proc (coord: Coord) -> (idx: Cell_Idx) {
     return Cell_Idx(grid.idx(board, coord))
 }
+cell_idx_safe :: proc (coord: Coord) -> (idx: Cell_Idx, ok: bool) {
+    return Cell_Idx(grid.idx_safe(board, coord) or_return), true
+}
 cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
     return Vec2(grid.coord(board, idx)) + Vec2(0.5)
 }
@@ -178,17 +184,17 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     // cell taken
     if prev_troop, cell_has_prev_troop := cell.troop.?;
-       cell_has_prev_troop && prev_troop != s.si {
+       cell_has_prev_troop && prev_troop != s.info.si {
         return false
     }
 
     // remove troop from it's current cell
     if prev_cell, has_prev_cell := cell_from_pos(s.pos);
-       has_prev_cell && prev_cell.troop == s.si {
+       has_prev_cell && prev_cell.troop == s.info.si {
         prev_cell.troop = nil
     }
 
-    cell.troop = s.si
+    cell.troop = s.info.si
     return true
 }
 troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
@@ -244,7 +250,7 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
         fmt.printfln("tried to set position outside of the grid: %v", pos)
 
         if prev_cell, has_prev_cell := cell_from_pos(s.pos);
-           has_prev_cell && prev_cell.troop == s.si {
+           has_prev_cell && prev_cell.troop == s.info.si {
             return // already in a cell
         }
 
@@ -308,8 +314,10 @@ game_init :: proc () {
                 append_nothing_soa(&troops)
 
                 s := troop_get(si)
-                s.si = si
-                s.ci = ci
+                s.info.si = si
+                s.info.ci = ci
+                s.info.ui = i
+                s.info.ui = i
 
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
@@ -354,42 +362,24 @@ update :: proc (dt: f32) -> bool {
     check_click: if k2.mouse_button_is_held(.Left) {
 
         // ignore clicks outside of the grid
-        _ = cell_idx_from_pos(mouse_world) or_break check_click
+        cell_idx := cell_idx_from_pos(mouse_world) or_break check_click
 
         if si, hovering_troop := hovered_troop.?; hovering_troop {
             // select company
 
             troop := troop_get(si)
             selected_company = Company_Handle{
-                side = troop.side,
-                idx  = troop.ci,
+                side = troop.info.side,
+                idx  = troop.info.ci,
             }
         }
         else if selected, is_selected := selected_company.?; is_selected {
             // set selected company's target
 
-            company := armies[selected.side].units[selected.idx]
-
-            for si, i in company.units {
-                s := troop_get(si)
-                pos := each_army_goal_pos(mouse_world, -0.2, i, len(company.units))
-                coord: Coord
-                origin := Coord(pos)
-                for {
-                    defer coord = grid.next_surrounding_cell(coord)
-
-                    s.movement.next_target = Cell_Idx(grid.idx_safe(board, origin + coord) or_continue)
-                    break
-                }
-            }
+            company := &armies[selected.side].units[selected.idx]
+            company.target = cell_idx
         }
     }
-
-    // // make walls (occupied cells) from the board
-    // walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
-    // for cell, i in grid.slice(board) {
-    //     walls.data[i] = cell.troop != nil
-    // }
 
     move_troops:
     for _, i in troops {
@@ -402,7 +392,27 @@ update :: proc (dt: f32) -> bool {
         }
 
         if time_to_update {
-            troop.movement.target = troop.movement.next_target
+
+            company := armies[troop.info.side].units[troop.info.ci]
+
+            if next_target, has_next_target := company.target.?; has_next_target {
+
+                target_origin_coord := cell_coord(next_target)
+                target_origin_pos   := cell_center(next_target)
+
+                target_pos   := each_army_goal_pos(target_origin_pos, -0.2, troop.info.ui, len(company.units))
+                target_coord := Coord(target_pos)
+
+                for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+
+                    coord := target_coord + offset
+                    troop.movement.target = cell_idx_safe(coord) or_continue
+                    break
+                }
+
+            } else {
+                troop.movement.target = nil
+            }
         }
 
         target, has_target := troop.movement.target.(Cell_Idx)
