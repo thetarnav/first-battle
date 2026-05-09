@@ -1,5 +1,6 @@
 package first_battle
 
+import "core:slice"
 import "core:time"
 import "base:runtime"
 import "core:fmt"
@@ -55,7 +56,7 @@ Troop :: struct {
     movement: struct {
         next_target: union {Cell_Idx},
         target:      union {Cell_Idx},
-        path:        [dynamic]Coord,
+        path:        [dynamic]Cell_Idx,
         prefer:      enum {Target, Path},
         time_left:   f32,
     },
@@ -245,7 +246,7 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
         }
 
         // add to any cell
-        for cell, cell_idx in grid.slice(&board) {
+        for cell, cell_idx in grid.slice(board) {
             if troop_add_to_cell(s, Cell_Idx(cell_idx)) {
                 s.pos = cell_center(Cell_Idx(cell_idx))
                 return
@@ -381,11 +382,11 @@ update :: proc (dt: f32) -> bool {
         }
     }
 
-    // make walls (occupied cells) from the board
-    walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
-    for cell, i in grid.slice(&board) {
-        walls.data[i] = cell.troop != nil
-    }
+    // // make walls (occupied cells) from the board
+    // walls := grid.make_empty(bool, board.size, allocator=context.temp_allocator)
+    // for cell, i in grid.slice(board) {
+    //     walls.data[i] = cell.troop != nil
+    // }
 
     move_troops:
     for _, i in troops {
@@ -421,9 +422,30 @@ update :: proc (dt: f32) -> bool {
             troop.movement.prefer = .Target
             clear(&troop.movement.path)
 
-            astar.astar(&troop.movement.path, walls, troop_coord, target_coord, allocator=context.temp_allocator)
+            path := make([dynamic]Coord, allocator=context.temp_allocator)
 
-            if len(troop.movement.path) > 0 {
+            board_path_pos := troop_coord
+            board_path_end := target_coord
+
+            slice_m   := 10
+            slice_pos := la.max(la.min(board_path_pos, board_path_end) - slice_m, 0)
+            slice_end := la.min(la.max(board_path_pos, board_path_end) + slice_m, Coord(board.size))
+
+            slice_path_pos := board_path_pos-slice_pos
+            slice_path_end := board_path_end-slice_pos
+
+            walls := grid.make_empty(bool, slice_end-slice_pos)
+            for &w, i in grid.slice(walls) {
+                board_coord := grid.coord(walls, i) + slice_pos
+                cell := grid.get(board, board_coord)
+                w = cell.troop != nil
+            }
+
+            if astar.astar(&path, walls, slice_path_pos, slice_path_end, allocator=context.temp_allocator) {
+                resize(&troop.movement.path, len(path))
+                for &p, i in troop.movement.path {
+                    p = cell_idx(path[i] + slice_pos)
+                }
                 troop.movement.prefer = .Path
             }
         }
@@ -438,13 +460,12 @@ update :: proc (dt: f32) -> bool {
             }
 
             next := troop.movement.path[0]
-            next_idx := cell_idx(next)
 
-            if troop_coord == next {
+            if troop_cell_idx == next {
                 pop_front(&troop.movement.path)
             }
 
-            if troop_move_towards(troop, next_idx, dt) do continue
+            if troop_move_towards(troop, next, dt) do continue
         }
 
         // troop_move_towards(troop, troop_cell_idx, dt)
@@ -466,7 +487,7 @@ frame :: proc (dt: f32) -> bool {
 
     draw_cross(wc, k2.DARK_GRAY)
 
-    for c, i in grid.slice(&board) {
+    for c, i in grid.slice(board) {
         if c.troop != nil {
             s := world_pos_to_screen(Vec2(grid.coord(board, i)))
             w := board_rect.size/BOARD_SIZE
