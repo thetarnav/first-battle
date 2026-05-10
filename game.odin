@@ -659,16 +659,17 @@ frame :: proc (dt: f32) -> bool {
 
         // color := army_player.color
         size := f32(troop_W)
-        color := armies[troop.info.side].color
+        c := armies[troop.info.side].color
         // if is_dead(s) {
         //     color = k2.DARK_GRAY
         // }
+        c = Color(color.darken(color.URGBA(c), min(troop.combat.dmg_taken, 1)/2))
         pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
-            color = k2.BLUE
+            c = k2.BLUE
             size *= 2
         }
-        k2.draw_circle(pos, size, color)
+        k2.draw_circle(pos, size, c)
     }
 
     // selected company outline
