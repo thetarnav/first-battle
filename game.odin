@@ -179,7 +179,7 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
 troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
     return &troops[idx]
 }
-troop_coord :: proc (idx: Troop_Idx) -> Coord {
+troop_get_coord :: proc (idx: Troop_Idx) -> Coord {
     return Coord(troops[idx].pos)
 }
 troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
@@ -414,13 +414,17 @@ update :: proc (dt: f32) -> bool {
         si := Troop_Idx(i)
         troop := &troops[si]
 
+        troop_coord := board_coord_from_pos(troop.pos)
+        troop_cell_idx := cell_idx(troop_coord)
+
         troop.movement.time_left -= dt
         time_to_update := troop.movement.time_left <= 0
         if time_to_update {
             troop.movement.time_left = rand.float32_range(200, 600)
         }
 
-        if time_to_update {
+        update_target: if time_to_update {
+            // update troop's target based on the current company target
 
             company := company_from_handle(troop_company_handle(si))
 
@@ -442,13 +446,25 @@ update :: proc (dt: f32) -> bool {
             case Company_Handle:
                 // go to closest available troop from target company
 
+                // already next to an enemy
+                for dir in grid.DIRECTION_VECTORS {
+                    cell_idx := cell_idx_safe(troop_coord + dir) or_continue
+                    cell_troop_idx := cell_get(cell_idx).troop.? or_continue
+                    if troop_company_handle(cell_troop_idx) == t {
+                        troop.movement.target = cell_idx
+                        break update_target
+                    }
+                }
+
                 target_company := company_from_handle(t)
 
+                // find closest enemy troop
                 context.user_ptr = &troop.pos
                 closest_idx := util.slice_min_proc(target_company.units, proc (idx: Troop_Idx) -> f32 {
+                    troop_pos := (^Vec2)(context.user_ptr)^
 
                     unit       := troop_get(idx)
-                    unit_coord := troop_coord(idx)
+                    unit_coord := troop_get_coord(idx)
 
                     is_accessable: {
                         for dir in grid.DIRECTION_VECTORS {
@@ -461,25 +477,24 @@ update :: proc (dt: f32) -> bool {
                         return math.inf_f32(1) // skip
                     }
 
-                    troop_pos := (^Vec2)(context.user_ptr)^
                     return la.distance(troop_pos, unit.pos)
                 }) or_break
 
-                closest_coord := troop_coord(closest_idx)
+                closest_coord := troop_get_coord(closest_idx)
 
-                for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
-
-                    coord := closest_coord + offset
-                    troop.movement.target = cell_idx_safe(coord) or_continue
-                    break
+                // set the target as one of the adjacent cells
+                for dir in grid.DIRECTION_VECTORS {
+                    cell_idx := cell_idx_safe(closest_coord + dir) or_continue
+                    if cell_get(cell_idx).troop == nil {
+                        troop.movement.target = cell_idx
+                        break
+                    }
                 }
             }
         }
 
         target, has_target := troop.movement.target.(Cell_Idx)
         target_coord := cell_coord(target)
-        troop_coord := board_coord_from_pos(troop.pos)
-        troop_cell_idx := cell_idx(troop_coord)
 
         direct:
         if has_target && target_coord != troop_coord &&
