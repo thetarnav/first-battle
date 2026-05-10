@@ -54,7 +54,12 @@ Troop :: struct {
         ui:       int,
     },
 
-    pos:      Vec2,
+    pos: Vec2,
+
+    combat: struct {
+        dmg_taken: f32,
+        in_fight:  f32,
+    },
 
     movement: struct {
         target:      Maybe(Cell_Idx),
@@ -248,6 +253,14 @@ troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: 
     }
 
     d := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
+
+    // in fight is slower
+    d /= Vec2(troop.combat.in_fight+1)
+    troop.combat.in_fight = 0
+
+    // slow down damaged individuals
+    d *= Vec2((1 - min(troop.combat.dmg_taken, 1))/2 + 0.5)
+
     n := troop.pos + (d * dt * 0.02)
     if la.is_nan(n) != false {
         return false
@@ -345,7 +358,7 @@ game_init :: proc () {
 
 update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
-    board_rect   = get_board_rect()
+    board_rect  = get_board_rect()
 }
 
 update :: proc (dt: f32) -> bool {
@@ -423,6 +436,12 @@ update :: proc (dt: f32) -> bool {
             troop.movement.time_left = rand.float32_range(200, 600)
         }
 
+        attack :: proc (troop, enemy: Troop_Ptr) {
+            enemy.combat.in_fight  += 0.8
+            enemy.combat.dmg_taken += 0.05
+            troop.combat.in_fight  += 1
+        }
+
         update_target: if time_to_update {
             // update troop's target based on the current company target
 
@@ -452,7 +471,9 @@ update :: proc (dt: f32) -> bool {
                     cell_troop_idx := cell_get(cell_idx).troop.? or_continue
                     if troop_company_handle(cell_troop_idx) == t {
                         troop.movement.target = cell_idx
-                        break update_target
+                        attack(troop, troop_get(cell_troop_idx))
+                        troop_move_towards(troop, troop_cell_idx, dt)
+                        continue move_troops
                     }
                 }
 
@@ -560,8 +581,37 @@ update :: proc (dt: f32) -> bool {
             if troop_move_towards(troop, next, dt) do continue
         }
 
+        for dir in grid.DIRECTION_VECTORS {
+            cell_idx := cell_idx_safe(troop_coord + dir) or_continue
+            cell_troop_idx := cell_get(cell_idx).troop.? or_continue
+            cell_troop := troop_get(cell_troop_idx)
+            if cell_troop.info.side == troop.info.side do continue
+
+            attack(troop, cell_troop)
+            break
+        }
+
         troop_move_towards(troop, troop_cell_idx, dt)
     }
+
+    // combat:
+    // for _, i in troops {
+    //     si := Troop_Idx(i)
+    //     troop := &troops[si]
+    //
+    //     troop_coord := board_coord_from_pos(troop.pos)
+    //     troop_cell_idx := cell_idx(troop_coord)
+    //
+    //     for dir in grid.DIRECTION_VECTORS {
+    //         cell_idx := cell_idx_safe(troop_coord + dir) or_continue
+    //         cell_troop_idx := cell_get(cell_idx).troop.? or_continue
+    //         cell_troop := troop_get(cell_troop_idx)
+    //         if cell_troop.info.side == troop.info.side do continue
+    //
+    //         cell_troop.combat.dmg_taken += 0.05
+    //         break
+    //     }
+    // }
 
     if k2.key_went_down(.Q) {
         return false
