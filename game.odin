@@ -446,9 +446,25 @@ update :: proc (dt: f32) -> bool {
 
                 context.user_ptr = &troop.pos
                 closest_idx := util.slice_min_proc(target_company.units, proc (idx: Troop_Idx) -> f32 {
+
+                    unit       := troop_get(idx)
+                    unit_coord := troop_coord(idx)
+
+                    is_accessable: {
+                        for dir in grid.DIRECTION_VECTORS {
+                            cell_idx := cell_idx_safe(unit_coord + dir) or_continue
+                            if cell_get(cell_idx).troop == nil {
+                                break is_accessable
+                            }
+                        }
+
+                        return math.inf_f32(1) // skip
+                    }
+
                     troop_pos := (^Vec2)(context.user_ptr)^
-                    return la.distance(troop_pos, troop_get(idx).pos)
+                    return la.distance(troop_pos, unit.pos)
                 }) or_break
+
                 closest_coord := troop_coord(closest_idx)
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
