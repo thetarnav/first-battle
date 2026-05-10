@@ -82,10 +82,13 @@ army_enemy  := &armies[.Enemy]
 
 initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, count: int} = {
     .Player = {
-        {"one", {30, 40}, -0.2, 200},
-        {"two", {80, 60},  0.2, 120},
+        {"one", {40, 80}, -0.2, 200},
+        {"two", {80, 60}, -0.4, 120},
     },
-    .Enemy  = {},
+    .Enemy  = {
+        {"one", {40, 36}, math.PI, 200},
+        {"two", {80, 30}, math.PI - 0.2, 120},
+    },
 }
 
 troops: Troop_Arr
@@ -102,7 +105,7 @@ board_rect:  Rect
 GOLDEN_RATIO  :: 1.618
 
 BOARD_X           :: 128
-BOARD_Y           :: 100
+BOARD_Y           :: 128
 BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
@@ -320,10 +323,11 @@ game_init :: proc () {
                 append_nothing_soa(&troops)
 
                 s := troop_get(si)
-                s.info.si = si
-                s.info.ci = ci
-                s.info.ui = i
-                s.info.ui = i
+                s.info.side = army.side
+                s.info.si   = si
+                s.info.ci   = ci
+                s.info.ui   = i
+                s.info.ui   = i
 
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
@@ -506,13 +510,13 @@ frame :: proc (dt: f32) -> bool {
 
     draw_cross(wc, k2.DARK_GRAY)
 
-    for c, i in grid.slice(board) {
-        if c.troop != nil {
-            s := world_pos_to_screen(Vec2(grid.coord(board, i)))
-            w := board_rect.size/BOARD_SIZE
-            k2.draw_rect({x=s.x, y=s.y, w=w.x, h=w.y}, k2.LIGHT_GRAY)
-        }
-    }
+    // for c, i in grid.slice(board) {
+    //     if c.troop != nil {
+    //         s := world_pos_to_screen(Vec2(grid.coord(board, i)))
+    //         w := board_rect.size/BOARD_SIZE
+    //         k2.draw_rect({x=s.x, y=s.y, w=w.x, h=w.y}, k2.LIGHT_GRAY)
+    //     }
+    // }
 
     {
         for xi in 0..=BOARD_X {
@@ -531,16 +535,16 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    for s, i in troops {
+    for troop, i in troops {
         si := Troop_Idx(i)
 
-        color := army_player.color
+        // color := army_player.color
         size := f32(troop_W)
-        // color := army.color
+        color := armies[troop.info.side].color
         // if is_dead(s) {
         //     color = k2.DARK_GRAY
         // }
-        pos := world_pos_to_screen(s.pos)
+        pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
             color = k2.BLUE
             size *= 2
