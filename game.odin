@@ -158,10 +158,6 @@ cell_rect :: proc (idx: Cell_Idx) -> (rect: Rect) {
     return {Vec2(grid.coord(board, idx)), 1}
 }
 
-troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
-    return &troops[idx]
-}
-
 army_count_dim :: proc (n: int) -> (res: [2]int) {
     res.y = int(math.sqrt(f32(n)/GOLDEN_RATIO))
     res.x = n/res.y
@@ -178,6 +174,16 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
     return
 }
 
+troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
+    return &troops[idx]
+}
+troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
+    troop := troop_get(idx)
+    return Company_Handle{
+        side = troop.info.side,
+        idx  = troop.info.ci,
+    }
+}
 troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
@@ -359,7 +365,7 @@ update :: proc (dt: f32) -> bool {
         }
     }
 
-    check_click: if k2.mouse_button_is_held(.Left) {
+    check_click: if k2.mouse_button_went_down(.Left) {
 
         // ignore clicks outside of the grid
         cell_idx := cell_idx_from_pos(mouse_world) or_break check_click
@@ -367,11 +373,8 @@ update :: proc (dt: f32) -> bool {
         if si, hovering_troop := hovered_troop.?; hovering_troop {
             // select company
 
-            troop := troop_get(si)
-            selected_company = Company_Handle{
-                side = troop.info.side,
-                idx  = troop.info.ci,
-            }
+            company_handle := troop_company_handle(si)
+            selected_company = company_handle if selected_company != company_handle else nil
         }
         else if selected, is_selected := selected_company.?; is_selected {
             // set selected company's target
