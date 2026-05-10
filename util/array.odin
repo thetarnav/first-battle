@@ -261,6 +261,62 @@ reset :: proc (arr: ^$T/[dynamic]$E, init: []E) -> (err: runtime.Allocator_Error
 }
 
 /*
+Finds the element with the minimum projected value in a slice.
+
+Inputs:
+- s: The slice to search.
+- f: Projection function that maps an element to a comparable value.
+
+Returns:
+- res: The element with the minimum projected value.
+- ok: True if the slice is non-empty, false otherwise.
+*/
+@(require_results)
+slice_min_proc :: proc(s: $S/[]$T, f: proc(T) -> $V) -> (res: T, ok: bool) where intrinsics.type_is_ordered(V) #optional_ok {
+	if len(s) != 0 {
+		res = s[0]
+		ok = true
+		min_val := f(res)
+		for v in s[1:] {
+			val := f(v)
+			if val < min_val {
+				res = v
+				min_val = val
+			}
+		}
+	}
+	return
+}
+
+/*
+Finds the element with the maximum projected value in a slice.
+
+Inputs:
+- s: The slice to search.
+- f: Projection function that maps an element to a comparable value.
+
+Returns:
+- res: The element with the maximum projected value.
+- ok: True if the slice is non-empty, false otherwise.
+*/
+@(require_results)
+slice_max_proc :: proc (s: $S/[]$T, f: proc (T) -> $V) -> (res: T, ok: bool) where intrinsics.type_is_ordered(V) #optional_ok {
+	if len(s) != 0 {
+		res = s[0]
+		ok = true
+		max_val := f(res)
+		for v in s[1:] {
+			val := f(v)
+			if val > max_val {
+				res = v
+				max_val = val
+			}
+		}
+	}
+	return
+}
+
+/*
 Groups items into connected components based on a connectivity check function.
 
 Items are considered part of the same component if they are directly or transitively

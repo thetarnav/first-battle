@@ -190,3 +190,89 @@ test_group_connected_components :: proc (t: ^testing.T) {
 		testing.expect_value(t, len(groups[2]), 1)
 	}
 }
+
+@(test)
+test_slice_min_proc :: proc (t: ^testing.T) {
+	// Test empty slice
+	{
+		s: []int
+		res, ok := slice_min_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, !ok)
+		testing.expect_value(t, res, 0)
+	}
+
+	// Test single element
+	{
+		s := []int{42}
+		res, ok := slice_min_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, 42)
+	}
+
+	// Test multiple elements
+	{
+		s := []int{5, 3, 8, 1, 9, 2}
+		res, ok := slice_min_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, 1)
+	}
+
+	// Test with custom projection (absolute value)
+	{
+		s := []int{-5, 3, -1, 2}
+		res, ok := slice_min_proc(s, proc(x: int) -> int {return abs(x)})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, -1)
+	}
+
+	// Test with negative numbers
+	{
+		s := []int{-5, -3, -8, -1}
+		res, ok := slice_min_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, -8)
+	}
+}
+
+@(test)
+test_slice_max_proc :: proc (t: ^testing.T) {
+	// Test empty slice
+	{
+		s: []int
+		res, ok := slice_max_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, !ok)
+		testing.expect_value(t, res, 0)
+	}
+
+	// Test single element
+	{
+		s := []int{42}
+		res, ok := slice_max_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, 42)
+	}
+
+	// Test multiple elements
+	{
+		s := []int{5, 3, 8, 1, 9, 2}
+		res, ok := slice_max_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, 9)
+	}
+
+	// Test with custom projection (absolute value)
+	{
+		s := []int{-5, 3, -8, 2}
+		res, ok := slice_max_proc(s, proc(x: int) -> int {return abs(x)})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, -8)
+	}
+
+	// Test with negative numbers
+	{
+		s := []int{-5, -3, -8, -1}
+		res, ok := slice_max_proc(s, proc(x: int) -> int {return x})
+		testing.expect(t, ok)
+		testing.expect_value(t, res, -1)
+	}
+}

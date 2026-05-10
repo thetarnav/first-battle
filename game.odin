@@ -1,7 +1,5 @@
 package first_battle
 
-import "core:slice"
-import "core:time"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -10,6 +8,7 @@ import "core:math/rand"
 import k2 "./karl2d"
 import "./color"
 import "./grid"
+import "./util"
 import astar "./grid/path"
 
 Vec2  :: k2.Vec2
@@ -37,7 +36,7 @@ Army :: struct {
 Company :: struct {
     name:     string,
     units:    []Troop_Idx,
-    target:   union {Cell_Idx},
+    target:   union {Cell_Idx, Company_Handle},
 }
 Company_Idx :: distinct u16
 
@@ -58,7 +57,7 @@ Troop :: struct {
     pos:      Vec2,
 
     movement: struct {
-        target:      union {Cell_Idx},
+        target:      Maybe(Cell_Idx),
         path:        [dynamic]Cell_Idx,
         prefer:      enum {Target, Path},
         time_left:   f32,
@@ -180,12 +179,18 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
 troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
     return &troops[idx]
 }
+troop_coord :: proc (idx: Troop_Idx) -> Coord {
+    return Coord(troops[idx].pos)
+}
 troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
     troop := troop_get(idx)
     return Company_Handle{
         side = troop.info.side,
         idx  = troop.info.ci,
     }
+}
+company_from_handle :: proc (handle: Company_Handle) -> ^Company {
+    return &armies[handle.side].units[handle.idx]
 }
 troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
@@ -375,22 +380,39 @@ update :: proc (dt: f32) -> bool {
         cell_idx := cell_idx_from_pos(mouse_world) or_break check_click
 
         if si, hovering_troop := hovered_troop.?; hovering_troop {
-            // select company
+            // company target
 
             company_handle := troop_company_handle(si)
-            selected_company = company_handle if selected_company != company_handle else nil
+
+            switch selected_company {
+            case nil:
+                // select
+                selected_company = company_handle
+            case company_handle:
+                // dissellect
+                selected_company = nil
+            case:
+                selected := selected_company.(Company_Handle)
+                if selected.side == company_handle.side {
+                    // select same side
+                    selected_company = company_handle
+                } else {
+                    // attack opposite side
+                    company_from_handle(selected).target = company_handle
+                }
+            }
         }
         else if selected, is_selected := selected_company.?; is_selected {
-            // set selected company's target
+            // cell target
 
-            company := &armies[selected.side].units[selected.idx]
-            company.target = cell_idx
+            company_from_handle(selected).target = cell_idx
         }
     }
 
     move_troops:
     for _, i in troops {
-        troop := &troops[i]
+        si := Troop_Idx(i)
+        troop := &troops[si]
 
         troop.movement.time_left -= dt
         time_to_update := troop.movement.time_left <= 0
@@ -400,25 +422,41 @@ update :: proc (dt: f32) -> bool {
 
         if time_to_update {
 
-            company := armies[troop.info.side].units[troop.info.ci]
+            company := company_from_handle(troop_company_handle(si))
 
-            if next_target, has_next_target := company.target.?; has_next_target {
-
-                target_origin_coord := cell_coord(next_target)
-                target_origin_pos   := cell_center(next_target)
-
-                target_pos   := each_army_goal_pos(target_origin_pos, -0.2, troop.info.ui, len(company.units))
-                target_coord := Coord(target_pos)
+            switch t in company.target {
+            case nil:
+                // drop target
+                troop.movement.target = nil
+            case Cell_Idx:
+                // go to closest available cell to target cell
+ 
+                target_pos := each_army_goal_pos(cell_center(t), -0.2, troop.info.ui, len(company.units))
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
-                    coord := target_coord + offset
+                    coord := Coord(target_pos) + offset
                     troop.movement.target = cell_idx_safe(coord) or_continue
                     break
                 }
+            case Company_Handle:
+                // go to closest available troop from target company
 
-            } else {
-                troop.movement.target = nil
+                target_company := company_from_handle(t)
+
+                context.user_ptr = &troop.pos
+                closest_idx := util.slice_min_proc(target_company.units, proc (idx: Troop_Idx) -> f32 {
+                    troop_pos := (^Vec2)(context.user_ptr)^
+                    return la.distance(troop_pos, troop_get(idx).pos)
+                }) or_break
+                closest_coord := troop_coord(closest_idx)
+
+                for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+
+                    coord := closest_coord + offset
+                    troop.movement.target = cell_idx_safe(coord) or_continue
+                    break
+                }
             }
         }
 
