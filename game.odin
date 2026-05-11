@@ -107,6 +107,8 @@ board: grid.Grid(Cell)
 // updated every fame
 window_size: Vec2
 board_rect:  Rect
+mouse_pos:   Vec2
+mouse_world: Vec2
 
 GOLDEN_RATIO  :: 1.618
 
@@ -374,34 +376,34 @@ game_init :: proc () {
 update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
     board_rect  = get_board_rect()
+    mouse_pos   = k2.get_mouse_position()
+    mouse_world = world_pos_from_screen(mouse_pos)
 }
 
-update :: proc (dt: f32) -> bool {
-
-    update_frame_globals()
-
-    mouse_pos := k2.get_mouse_position()
-    mouse_world := world_pos_from_screen(mouse_pos)
-
+update_hover :: proc () -> (ok: bool) {
     hovered_troop = nil
-    check_mouse_hover: {
-        coord: Coord
-        origin := board_coord_from_pos(mouse_world) or_break check_mouse_hover
-        r := 2
-        d := r*2
-        w := d+1
-        steps := w*w - 4
-        for _ in 0..<steps {
-            defer coord = grid.next_surrounding_cell(coord)
 
-            celli := cell_idx_safe(origin + coord) or_continue
-            troopi := cell_get(celli).troop.? or_continue
-            if troop_is_dead(troopi) do continue
+    coord: Coord
+    origin := board_coord_from_pos(mouse_world) or_return
+    r := 2
+    d := r*2
+    w := d+1
+    steps := w*w - 4
+    for _ in 0..<steps {
+        defer coord = grid.next_surrounding_cell(coord)
 
-            hovered_troop = troopi
-            break
-        }
+        celli := cell_idx_safe(origin + coord) or_continue
+        troopi := cell_get(celli).troop.? or_continue
+        if troop_is_dead(troopi) do continue
+
+        hovered_troop = troopi
+        break
     }
+
+    return true
+}
+
+update_dead_troops :: proc () -> (ok: bool) {
 
     for army in armies {
         for &company in army.units {
@@ -430,49 +432,58 @@ update :: proc (dt: f32) -> bool {
     }
 
     // disselect company where everyone is dead
-    check_selected_alive: if selected, is_selected := selected_company.?; is_selected {
+    if selected, is_selected := selected_company.?; is_selected {
         company := company_from_handle(selected)
         if company.dead_units == len(company.units) {
             selected_company = nil
         }
     }
 
-    check_click: if k2.mouse_button_went_down(.Left) {
+    return true
+}
 
-        // ignore clicks outside of the grid
-        cell_idx := cell_idx_from_pos(mouse_world) or_break check_click
+update_click :: proc () -> (ok: bool) {
 
-        if si, hovering_troop := hovered_troop.?; hovering_troop {
-            // company target
+    if !k2.mouse_button_went_down(.Left) do return
 
-            company_handle := troop_company_handle(si)
+    // ignore clicks outside of the grid
+    cell_idx := cell_idx_from_pos(mouse_world) or_return
 
-            switch selected_company {
-            case nil:
-                // select
+    if si, hovering_troop := hovered_troop.?; hovering_troop {
+        // company target
+
+        company_handle := troop_company_handle(si)
+
+        switch selected_company {
+        case nil:
+            // select
+            selected_company = company_handle
+        case company_handle:
+            // dissellect
+            selected_company = nil
+        case:
+            selected := selected_company.(Company_Handle)
+            if selected.side == company_handle.side {
+                // select same side
                 selected_company = company_handle
-            case company_handle:
-                // dissellect
-                selected_company = nil
-            case:
-                selected := selected_company.(Company_Handle)
-                if selected.side == company_handle.side {
-                    // select same side
-                    selected_company = company_handle
-                } else {
-                    // attack opposite side
-                    company_from_handle(selected).target = company_handle
-                }
+            } else {
+                // attack opposite side
+                company_from_handle(selected).target = company_handle
             }
         }
-        else if selected, is_selected := selected_company.?; is_selected {
-            // cell target
+    }
+    else if selected, is_selected := selected_company.?; is_selected {
+        // cell target
 
-            company_from_handle(selected).target = cell_idx
-        }
+        company_from_handle(selected).target = cell_idx
     }
 
-    move_troops:
+    return true
+}
+
+update_troops :: proc (dt: f32) -> (ok: bool) {
+
+    update_troops:
     for _, i in troops {
         si := Troop_Idx(i)
         troop := &troops[si]
@@ -532,7 +543,7 @@ update :: proc (dt: f32) -> bool {
                     attack(troop, ctroop) or_continue
                     troop.movement.target = cidx
                     troop_move_towards(troop, troop_cell_idx, dt)
-                    continue move_troops
+                    continue update_troops
                 }
 
                 target_company := company_from_handle(t)
@@ -657,6 +668,17 @@ update :: proc (dt: f32) -> bool {
 
         troop_move_towards(troop, troop_cell_idx, dt)
     }
+
+    return true
+}
+
+update :: proc (dt: f32) -> bool {
+
+    update_frame_globals()
+    update_dead_troops()
+    update_hover()
+    update_click()
+    update_troops(dt)
 
     if k2.key_went_down(.Q) {
         return false
