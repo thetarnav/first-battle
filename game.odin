@@ -54,7 +54,6 @@ Troop :: struct {
         si:       Troop_Idx,
         side:     Army_Side,
         ci:       Company_Idx,
-        ui:       int,
     },
 
     pos: Vec2,
@@ -378,8 +377,6 @@ game_init :: proc () {
                 s.info.side = army.side
                 s.info.si   = si
                 s.info.ci   = ci
-                s.info.ui   = i
-                s.info.ui   = i
 
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
