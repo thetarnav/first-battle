@@ -11,6 +11,7 @@ import "./grid"
 import "./util"
 import astar "./grid/path"
 
+
 Vec2  :: k2.Vec2
 Color :: k2.Color
 Coord :: grid.Coord
@@ -34,9 +35,10 @@ Army :: struct {
 }
 
 Company :: struct {
-    name:     string,
-    units:    []Troop_Idx,
-    target:   union {Cell_Idx, Company_Handle},
+    name:       string,
+    units:      []Troop_Idx,
+    dead_units: int,
+    target:     union {Cell_Idx, Company_Handle},
 }
 Company_Idx :: distinct u16
 
@@ -164,6 +166,11 @@ cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
 cell_rect :: proc (idx: Cell_Idx) -> (rect: Rect) {
     return {Vec2(grid.coord(board, idx)), 1}
 }
+cell_troop :: proc (idx: Cell_Idx) -> (troop: Troop_Ptr, ok: bool) {
+    cell := cell_get(idx)
+    troopi := cell.troop.? or_return
+    return troop_get(troopi), true
+}
 
 army_count_dim :: proc (n: int) -> (res: [2]int) {
     res.y = int(math.sqrt(f32(n)/GOLDEN_RATIO))
@@ -187,6 +194,11 @@ troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
 troop_get_coord :: proc (idx: Troop_Idx) -> Coord {
     return Coord(troops[idx].pos)
 }
+troop_cell :: proc (idx: Troop_Idx) -> (cell: ^Cell) {
+    coord := troop_get_coord(idx)
+    cidx  := cell_idx(coord)
+    return cell_get(cidx)
+}
 troop_is_dead :: proc (idx: Troop_Idx) -> bool {
     return troop_get(idx).combat.dmg_taken >= 1
 }
@@ -206,8 +218,8 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     // cell taken
     if prev_troop, cell_has_prev_troop := cell.troop.?;
-       cell_has_prev_troop && prev_troop != s.info.si {
-        return false
+       cell_has_prev_troop && prev_troop != s.info.si && !troop_is_dead(prev_troop) {
+        return false // TODO: corpses shouldn't disappear—be overwritten by moving troops
     }
 
     // remove troop from it's current cell
@@ -382,11 +394,46 @@ update :: proc (dt: f32) -> bool {
         for _ in 0..<steps {
             defer coord = grid.next_surrounding_cell(coord)
 
-            cell := grid.get_safe(board, origin + coord) or_continue
-            si := cell.troop.? or_continue
+            celli := cell_idx_safe(origin + coord) or_continue
+            troopi := cell_get(celli).troop.? or_continue
+            if troop_is_dead(troopi) do continue
 
-            hovered_troop = si
+            hovered_troop = troopi
             break
+        }
+    }
+
+    for army in armies {
+        for &company in army.units {
+            company.dead_units = 0
+            for uidx in company.units {
+                if troop_is_dead(uidx) {
+                    company.dead_units += 1
+                    ucell := troop_cell(uidx)
+                    if ucell.troop == uidx {
+                        ucell.troop = nil
+                    }
+                }
+            }
+        }
+    }
+
+    for army in armies {
+        for &company in army.units {
+            if target_handle, has_target := company.target.(Company_Handle); has_target {
+                target_company := company_from_handle(target_handle)
+                if target_company.dead_units == len(target_company.units) {
+                    company.target = nil
+                }
+            }
+        }
+    }
+
+    // disselect company where everyone is dead
+    check_selected_alive: if selected, is_selected := selected_company.?; is_selected {
+        company := company_from_handle(selected)
+        if company.dead_units == len(company.units) {
+            selected_company = nil
         }
     }
 
@@ -441,10 +488,15 @@ update :: proc (dt: f32) -> bool {
             troop.movement.time_left = rand.float32_range(200, 600)
         }
 
-        attack :: proc (troop, enemy: Troop_Ptr) {
+        attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
+            if enemy.info.side == troop.info.side do return
+            if troop_is_dead(enemy.info.si) do return
+
             enemy.combat.in_fight  += 0.8
             enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + 0.1, 1)
             troop.combat.in_fight  += 1
+
+            return true
         }
 
         update_target: if time_to_update {
@@ -472,30 +524,34 @@ update :: proc (dt: f32) -> bool {
 
                 // already next to an enemy
                 for dir in grid.DIRECTION_VECTORS {
-                    cell_idx := cell_idx_safe(troop_coord + dir) or_continue
-                    cell_troop_idx := cell_get(cell_idx).troop.? or_continue
-                    if troop_company_handle(cell_troop_idx) == t {
-                        troop.movement.target = cell_idx
-                        attack(troop, troop_get(cell_troop_idx))
-                        troop_move_towards(troop, troop_cell_idx, dt)
-                        continue move_troops
-                    }
+
+                    cidx   := cell_idx_safe(troop_coord + dir) or_continue
+                    ctroop := cell_troop(cidx) or_continue
+                    if troop_company_handle(ctroop.info.si) != t do continue
+
+                    attack(troop, ctroop) or_continue
+                    troop.movement.target = cidx
+                    troop_move_towards(troop, troop_cell_idx, dt)
+                    continue move_troops
                 }
 
                 target_company := company_from_handle(t)
 
                 // find closest enemy troop
                 context.user_ptr = &troop.pos
-                closest_idx := util.slice_min_proc(target_company.units, proc (idx: Troop_Idx) -> f32 {
+                closest_idx := util.slice_min_proc(target_company.units, proc (uidx: Troop_Idx) -> f32 {
                     troop_pos := (^Vec2)(context.user_ptr)^
 
-                    unit       := troop_get(idx)
-                    unit_coord := troop_get_coord(idx)
+                    utroop := troop_get(uidx)
+                    ucoord := troop_get_coord(uidx)
+
+                    if troop_is_dead(uidx) do return math.inf_f32(1) // skip
 
                     is_accessable: {
                         for dir in grid.DIRECTION_VECTORS {
-                            cell_idx := cell_idx_safe(unit_coord + dir) or_continue
-                            if cell_get(cell_idx).troop == nil {
+                            cidx := cell_idx_safe(ucoord + dir) or_continue
+                            ctroop, has_troop := cell_troop(cidx)
+                            if !has_troop || troop_is_dead(ctroop.info.si) {
                                 break is_accessable
                             }
                         }
@@ -503,16 +559,17 @@ update :: proc (dt: f32) -> bool {
                         return math.inf_f32(1) // skip
                     }
 
-                    return la.distance(troop_pos, unit.pos)
+                    return la.distance(troop_pos, utroop.pos)
                 }) or_break
 
                 closest_coord := troop_get_coord(closest_idx)
 
                 // set the target as one of the adjacent cells
                 for dir in grid.DIRECTION_VECTORS {
-                    cell_idx := cell_idx_safe(closest_coord + dir) or_continue
-                    if cell_get(cell_idx).troop == nil {
-                        troop.movement.target = cell_idx
+                    cidx := cell_idx_safe(closest_coord + dir) or_continue
+                    ctroop, has_troop := cell_troop(cidx)
+                    if !has_troop || troop_is_dead(ctroop.info.si) {
+                        troop.movement.target = cidx
                         break
                     }
                 }
@@ -554,8 +611,11 @@ update :: proc (dt: f32) -> bool {
             walls := grid.make_empty(bool, slice_rect.size)
             for &w, i in grid.slice(walls) {
                 board_coord := grid.coord(walls, i) + slice_rect
-                cell := grid.get(board, board_coord)
-                w = cell.troop != nil
+                board_idx   := cell_idx(board_coord)
+                board_troop, cell_has_troop := cell_troop(board_idx)
+                if cell_has_troop && !troop_is_dead(board_troop.info.si) {
+                    w = true
+                }
             }
 
             path := make([dynamic]Coord, allocator=context.temp_allocator)
@@ -588,37 +648,15 @@ update :: proc (dt: f32) -> bool {
 
         if time_to_update {
             for dir in grid.DIRECTION_VECTORS {
-                cell_idx := cell_idx_safe(troop_coord + dir) or_continue
-                cell_troop_idx := cell_get(cell_idx).troop.? or_continue
-                cell_troop := troop_get(cell_troop_idx)
-                if cell_troop.info.side == troop.info.side do continue
-
-                attack(troop, cell_troop)
+                cidx := cell_idx_safe(troop_coord + dir) or_continue
+                ctroop := cell_troop(cidx) or_continue
+                attack(troop, ctroop) or_continue
                 break
             }
         }
 
         troop_move_towards(troop, troop_cell_idx, dt)
     }
-
-    // combat:
-    // for _, i in troops {
-    //     si := Troop_Idx(i)
-    //     troop := &troops[si]
-    //
-    //     troop_coord := board_coord_from_pos(troop.pos)
-    //     troop_cell_idx := cell_idx(troop_coord)
-    //
-    //     for dir in grid.DIRECTION_VECTORS {
-    //         cell_idx := cell_idx_safe(troop_coord + dir) or_continue
-    //         cell_troop_idx := cell_get(cell_idx).troop.? or_continue
-    //         cell_troop := troop_get(cell_troop_idx)
-    //         if cell_troop.info.side == troop.info.side do continue
-    //
-    //         cell_troop.combat.dmg_taken += 0.05
-    //         break
-    //     }
-    // }
 
     if k2.key_went_down(.Q) {
         return false
@@ -635,14 +673,6 @@ frame :: proc (dt: f32) -> bool {
     wc := window_size/2
 
     draw_cross(wc, k2.DARK_GRAY)
-
-    // for c, i in grid.slice(board) {
-    //     if c.troop != nil {
-    //         s := world_pos_to_screen(Vec2(grid.coord(board, i)))
-    //         w := board_rect.size/BOARD_SIZE
-    //         k2.draw_rect({x=s.x, y=s.y, w=w.x, h=w.y}, k2.LIGHT_GRAY)
-    //     }
-    // }
 
     {
         for xi in 0..=BOARD_X {
@@ -683,8 +713,8 @@ frame :: proc (dt: f32) -> bool {
 
         points := make([dynamic]Vec2, 0, len(company.units), allocator=context.temp_allocator)
         for si in company.units {
-            s := troop_get(si)
-            append(&points, s.pos)
+            if troop_is_dead(si) do continue
+            append(&points, troop_get(si).pos)
         }
 
         outline := convex_hull(points[:], allocator=context.temp_allocator)
