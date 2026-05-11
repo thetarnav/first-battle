@@ -187,6 +187,9 @@ troop_get :: proc (idx: Troop_Idx) -> Troop_Ptr {
 troop_get_coord :: proc (idx: Troop_Idx) -> Coord {
     return Coord(troops[idx].pos)
 }
+troop_is_dead :: proc (idx: Troop_Idx) -> bool {
+    return troop_get(idx).combat.dmg_taken >= 1
+}
 troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
     troop := troop_get(idx)
     return Company_Handle{
@@ -246,27 +249,27 @@ troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: 
     s_pos := troop.pos
     e_pos := Vec2(e_coord) + Vec2(0.5)
 
+    diff := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
+
+    // in fight is slower
+    diff /= Vec2(troop.combat.in_fight+1)
+    troop.combat.in_fight = max(troop.combat.in_fight - 1 * dt, 0)
+
+    // slow down damaged troops
+    diff *= Vec2((1 - troop.combat.dmg_taken)/2 + 0.5)
+
     // end
-    if distance(s_pos, e_pos) < 0.01 && s_coord == e_coord {
+    if la.length(diff) < 0.01 && s_coord == e_coord {
         troop.pos = e_pos
         return true
     }
 
-    d := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
-
-    // in fight is slower
-    d /= Vec2(troop.combat.in_fight+1)
-    troop.combat.in_fight = 0
-
-    // slow down damaged individuals
-    d *= Vec2((1 - min(troop.combat.dmg_taken, 1))/2 + 0.5)
-
-    n := troop.pos + (d * dt * 0.02)
-    if la.is_nan(n) != false {
+    new := troop.pos + (diff * dt * 0.02)
+    if la.is_nan(new) != false {
         return false
     }
 
-    return troop_set_pos(troop, n)
+    return troop_set_pos(troop, new)
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
@@ -427,6 +430,8 @@ update :: proc (dt: f32) -> bool {
         si := Troop_Idx(i)
         troop := &troops[si]
 
+        if troop_is_dead(si) do continue
+
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
 
@@ -438,7 +443,7 @@ update :: proc (dt: f32) -> bool {
 
         attack :: proc (troop, enemy: Troop_Ptr) {
             enemy.combat.in_fight  += 0.8
-            enemy.combat.dmg_taken += 0.05
+            enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + 0.1, 1)
             troop.combat.in_fight  += 1
         }
 
@@ -581,14 +586,16 @@ update :: proc (dt: f32) -> bool {
             if troop_move_towards(troop, next, dt) do continue
         }
 
-        for dir in grid.DIRECTION_VECTORS {
-            cell_idx := cell_idx_safe(troop_coord + dir) or_continue
-            cell_troop_idx := cell_get(cell_idx).troop.? or_continue
-            cell_troop := troop_get(cell_troop_idx)
-            if cell_troop.info.side == troop.info.side do continue
+        if time_to_update {
+            for dir in grid.DIRECTION_VECTORS {
+                cell_idx := cell_idx_safe(troop_coord + dir) or_continue
+                cell_troop_idx := cell_get(cell_idx).troop.? or_continue
+                cell_troop := troop_get(cell_troop_idx)
+                if cell_troop.info.side == troop.info.side do continue
 
-            attack(troop, cell_troop)
-            break
+                attack(troop, cell_troop)
+                break
+            }
         }
 
         troop_move_towards(troop, troop_cell_idx, dt)
@@ -660,10 +667,7 @@ frame :: proc (dt: f32) -> bool {
         // color := army_player.color
         size := f32(troop_W)
         c := armies[troop.info.side].color
-        // if is_dead(s) {
-        //     color = k2.DARK_GRAY
-        // }
-        c = Color(color.darken(color.URGBA(c), min(troop.combat.dmg_taken, 1)/2))
+        c = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken)
         pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
             c = k2.BLUE
