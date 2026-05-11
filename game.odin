@@ -75,7 +75,8 @@ Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
 
 Cell :: struct {
-    troop: Maybe(Troop_Idx),
+    troop:  Maybe(Troop_Idx),
+    corpse: bool,
 }
 Cell_Idx :: distinct u16
 
@@ -119,9 +120,9 @@ BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
 
-troop_W :: 4
-troop_M :: 3
-troop_S :: troop_W + troop_M*2
+TROOP_W :: 4
+TROOP_M :: 3
+TROOP_S :: TROOP_W + TROOP_M*2
 
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
@@ -173,6 +174,9 @@ cell_troop :: proc (idx: Cell_Idx) -> (troop: Troop_Ptr, ok: bool) {
     troopi := cell.troop.? or_return
     return troop_get(troopi), true
 }
+cell_corpse :: proc (idx: Cell_Idx) -> (is_corpse: bool) {
+    return cell_get(idx).corpse
+}
 
 army_count_dim :: proc (n: int) -> (res: [2]int) {
     res.y = int(math.sqrt(f32(n)/GOLDEN_RATIO))
@@ -204,6 +208,9 @@ troop_cell :: proc (idx: Troop_Idx) -> (cell: ^Cell) {
 troop_is_dead :: proc (idx: Troop_Idx) -> bool {
     return troop_get(idx).combat.dmg_taken >= 1
 }
+troop_is_alive :: proc (idx: Troop_Idx) -> bool {
+    return !troop_is_dead(idx)
+}
 troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
     troop := troop_get(idx)
     return Company_Handle{
@@ -220,8 +227,12 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     // cell taken
     if prev_troop, cell_has_prev_troop := cell.troop.?;
-       cell_has_prev_troop && prev_troop != s.info.si && !troop_is_dead(prev_troop) {
-        return false // TODO: corpses shouldn't disappear—be overwritten by moving troops
+       cell_has_prev_troop && prev_troop != s.info.si {
+        if  troop_is_alive(prev_troop) {
+            return false
+        } else {
+            cell.corpse = true
+        }
     }
 
     // remove troop from it's current cell
@@ -271,6 +282,11 @@ troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: 
 
     // slow down damaged troops
     diff *= Vec2((1 - troop.combat.dmg_taken)/2 + 0.5)
+
+    // slower on corpses
+    if cell_corpse(s_idx) {
+        diff *= 0.75
+    }
 
     // end
     if la.length(diff) < 0.01 && s_coord == e_coord {
@@ -405,21 +421,25 @@ update_hover :: proc () -> (ok: bool) {
 
 update_dead_troops :: proc () -> (ok: bool) {
 
+    // update dead_units count
     for army in armies {
         for &company in army.units {
             company.dead_units = 0
+
             for uidx in company.units {
-                if troop_is_dead(uidx) {
-                    company.dead_units += 1
-                    ucell := troop_cell(uidx)
-                    if ucell.troop == uidx {
-                        ucell.troop = nil
-                    }
+                troop_is_dead(uidx) or_continue
+
+                company.dead_units += 1
+                ucell := troop_cell(uidx)
+                if ucell.troop == uidx {
+                    ucell.troop  = nil
+                    ucell.corpse = true
                 }
             }
         }
     }
 
+    // don't target dead company
     for army in armies {
         for &company in army.units {
             if target_handle, has_target := company.target.(Company_Handle); has_target {
@@ -431,7 +451,7 @@ update_dead_troops :: proc () -> (ok: bool) {
         }
     }
 
-    // disselect company where everyone is dead
+    // disselect dead company
     if selected, is_selected := selected_company.?; is_selected {
         company := company_from_handle(selected)
         if company.dead_units == len(company.units) {
@@ -692,10 +712,16 @@ frame :: proc (dt: f32) -> bool {
 
     k2.draw_text("Hellope!", {50, 50}, 100, k2.DARK_BLUE)
 
-    wc := window_size/2
+    // draw corpses
+    for cell, i in grid.slice(board) {
+        if cell_corpse(Cell_Idx(i)) {
+            p := cell_center(Cell_Idx(i))
+            p = world_pos_to_screen(p)
+            k2.draw_circle(p, f32(TROOP_W), k2.DARK_GRAY)
+        }
+    }
 
-    draw_cross(wc, k2.DARK_GRAY)
-
+    // draw lines
     {
         for xi in 0..=BOARD_X {
             xp := f32(xi)/BOARD_X
@@ -713,13 +739,16 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
+    // draw troops
     for troop, i in troops {
         si := Troop_Idx(i)
 
+        troop_is_alive(si) or_continue
+
         // color := army_player.color
-        size := f32(troop_W)
+        size := f32(TROOP_W)
         c := armies[troop.info.side].color
-        c = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken)
+        c = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
             c = k2.BLUE
@@ -762,6 +791,8 @@ frame :: proc (dt: f32) -> bool {
 
     mouse_pos := k2.get_mouse_position()
     draw_cross(mouse_pos, k2.GREEN)
+
+    draw_cross(window_size/2, k2.YELLOW)
 
     // p: Coord
     // N :: 1000
