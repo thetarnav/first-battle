@@ -289,6 +289,36 @@ slice_min_proc :: proc(s: $S/[]$T, f: proc(T) -> $V) -> (res: T, ok: bool) where
 }
 
 /*
+Finds the element index with the minimum projected value in a slice.
+
+Inputs:
+- s: The slice to search.
+- f: Projection function that maps an element to a comparable value.
+
+Returns:
+- idx:   the found element index
+- found: true if found element
+*/
+@(require_results)
+slice_min_idx_proc :: proc(s: $S/[]$T, f: proc(T) -> (val: $V, ok: bool)) -> (idx: int, ok: bool) where intrinsics.type_is_ordered(V) #optional_ok #no_bounds_check {
+    min_val: V
+    i := 0
+    for ; i < len(s); i += 1 {
+        min_val = f(s[i]) or_continue
+        idx, ok = i, true
+        break
+    }
+    for ; i < len(s); i += 1 {
+        val := f(s[i]) or_continue
+        if val < min_val {
+            idx = i
+            min_val = val
+        }
+    }
+	return
+}
+
+/*
 Finds the element with the maximum projected value in a slice.
 
 Inputs:

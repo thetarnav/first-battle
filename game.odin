@@ -39,6 +39,7 @@ Company :: struct {
     name:        string,
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
+    avg_pos:     Vec2,
     target:      union {Cell_Idx, Company_Handle},
 }
 Company_Idx :: distinct u16
@@ -87,16 +88,23 @@ armies: [Army_Side]Army = {
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
+@rodata
 initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, count: int} = {
     .Player = {
         {"one", {40, 80}, -0.2, 200},
         {"two", {80, 60}, -0.4, 120},
     },
     .Enemy  = {
-        {"one", {40, 36}, math.PI, 200},
+        {"one", {40, 36}, math.PI,       200},
         {"two", {80, 30}, math.PI - 0.2, 120},
     },
 }
+
+automatic := [Army_Side]bool{
+    .Player = false,
+    .Enemy  = true,
+}
+is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 
 troops: Troop_Arr
 
@@ -417,26 +425,31 @@ update_hover :: proc () -> (ok: bool) {
     return true
 }
 
-update_dead_troops :: proc () -> (ok: bool) {
+update_companies :: proc () -> (ok: bool) {
 
-    // update alive units array
+    // update alive units array and average company position
     for army in armies {
         for &company in army.units {
 
             alive_units := make([dynamic]Troop_Idx, 0, len(company.units), allocator=context.temp_allocator)
-            defer company.alive_units = alive_units[:]
-            defer shrink(&alive_units)
+
+            sum_pos: Vec2
 
             for uidx in company.units {
                 ucell := troop_cell(uidx)
 
                 if troop_is_alive(uidx) {
                     append(&alive_units, uidx)
+                    sum_pos += troop_get(uidx).pos
                 } else if ucell.troop == uidx {
                     ucell.troop  = nil
                     ucell.corpse = true
                 }
             }
+
+            shrink(&alive_units)
+            company.alive_units = alive_units[:]
+            company.avg_pos     = sum_pos/f32(len(alive_units))
         }
     }
 
@@ -477,8 +490,12 @@ update_click :: proc () -> (ok: bool) {
 
         switch selected_company {
         case nil:
-            // select
-            selected_company = company_handle
+            if is_automatic(company_handle.side) {
+                // cannot select automatic side
+            } else {
+                // select
+                selected_company = company_handle
+            }
         case company_handle:
             // dissellect
             selected_company = nil
@@ -490,6 +507,7 @@ update_click :: proc () -> (ok: bool) {
             } else {
                 // attack opposite side
                 company_from_handle(selected).target = company_handle
+                selected_company = nil // disselect after action
             }
         }
     }
@@ -497,6 +515,34 @@ update_click :: proc () -> (ok: bool) {
         // cell target
 
         company_from_handle(selected).target = cell_idx
+        selected_company = nil // disselect after action
+    }
+
+    return true
+}
+
+update_automatic :: proc () -> (ok: bool) {
+
+    for army in armies {
+        is_automatic(army.side) or_continue
+
+        for &comp in army.units {
+
+            // select closest enemy company to attack
+            context.user_ptr = &comp.avg_pos
+            closest_idx, found := util.slice_min_idx_proc(armies[side_opposite(army.side)].units, proc (ecomp: Company) -> (val: f32, ok: bool) {
+                if len(ecomp.alive_units) == 0 {
+                    return 0, false
+                }
+                return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
+            })
+
+            if found {
+                comp.target = Company_Handle{side = side_opposite(army.side), idx = Company_Idx(closest_idx)}
+            } else {
+                comp.target = nil
+            }
+        }
     }
 
     return true
@@ -698,9 +744,10 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 update :: proc (dt: f32) -> bool {
 
     update_frame_globals()
-    update_dead_troops()
+    update_companies()
     update_hover()
     update_click()
+    update_automatic()
     update_troops(dt)
 
     if k2.key_went_down(.Q) {
