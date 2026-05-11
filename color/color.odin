@@ -5,11 +5,11 @@ import "base:builtin"
 import la "core:math/linalg"
 
 
-FRGB  :: distinct [3]f32
-FRGBA :: distinct [4]f32
+FRGB  :: [3]f32
+FRGBA :: [4]f32
 
-URGB  :: distinct [3]u8
-URGBA :: distinct [4]u8
+URGB  :: [3]u8
+URGBA :: [4]u8
 
 RGB  :: URGB
 RGBA :: URGBA
