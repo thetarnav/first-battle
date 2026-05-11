@@ -1,5 +1,6 @@
 package first_battle
 
+import "core:slice"
 import "base:runtime"
 import "core:fmt"
 import "core:math"
@@ -35,10 +36,10 @@ Army :: struct {
 }
 
 Company :: struct {
-    name:       string,
-    units:      []Troop_Idx,
-    dead_units: int,
-    target:     union {Cell_Idx, Company_Handle},
+    name:        string,
+    units:       []Troop_Idx,
+    alive_units: []Troop_Idx,
+    target:      union {Cell_Idx, Company_Handle},
 }
 Company_Idx :: distinct u16
 
@@ -421,17 +422,20 @@ update_hover :: proc () -> (ok: bool) {
 
 update_dead_troops :: proc () -> (ok: bool) {
 
-    // update dead_units count
+    // update alive units array
     for army in armies {
         for &company in army.units {
-            company.dead_units = 0
+
+            alive_units := make([dynamic]Troop_Idx, 0, len(company.units), allocator=context.temp_allocator)
+            defer company.alive_units = alive_units[:]
+            defer shrink(&alive_units)
 
             for uidx in company.units {
-                troop_is_dead(uidx) or_continue
-
-                company.dead_units += 1
                 ucell := troop_cell(uidx)
-                if ucell.troop == uidx {
+
+                if troop_is_alive(uidx) {
+                    append(&alive_units, uidx)
+                } else if ucell.troop == uidx {
                     ucell.troop  = nil
                     ucell.corpse = true
                 }
@@ -444,7 +448,7 @@ update_dead_troops :: proc () -> (ok: bool) {
         for &company in army.units {
             if target_handle, has_target := company.target.(Company_Handle); has_target {
                 target_company := company_from_handle(target_handle)
-                if target_company.dead_units == len(target_company.units) {
+                if len(target_company.alive_units) == 0 {
                     company.target = nil
                 }
             }
@@ -454,7 +458,7 @@ update_dead_troops :: proc () -> (ok: bool) {
     // disselect dead company
     if selected, is_selected := selected_company.?; is_selected {
         company := company_from_handle(selected)
-        if company.dead_units == len(company.units) {
+        if len(company.alive_units) == 0 {
             selected_company = nil
         }
     }
@@ -542,7 +546,9 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             case Cell_Idx:
                 // go to closest available cell to target cell
  
-                target_pos := each_army_goal_pos(cell_center(t), -0.2, troop.info.ui, len(company.units))
+                // arrange only the alive troops
+                alive_idx, _ := slice.binary_search(company.alive_units, troop.info.si)
+                target_pos := each_army_goal_pos(cell_center(t), -0.2, alive_idx, len(company.alive_units))
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
@@ -763,20 +769,19 @@ frame :: proc (dt: f32) -> bool {
         company := armies[selected.side].units[selected.idx]
 
         points := make([dynamic]Vec2, 0, len(company.units), allocator=context.temp_allocator)
-        for si in company.units {
-            if troop_is_dead(si) do continue
+        for si in company.alive_units {
             append(&points, troop_get(si).pos)
         }
 
         outline := convex_hull(points[:], allocator=context.temp_allocator)
 
-        if len(outline) < 3 && len(company.units) > 0 {
-            s := troop_get(company.units[0])
+        if len(outline) < 3 && len(company.alive_units) > 0 {
+            s := troop_get(company.alive_units[0])
             p := s.pos
             outline = {
-                p + {+6, +3},
-                p + {-6, +3},
-                p + { 0, -3},
+                p + {+4, +2},
+                p + {-4, +2},
+                p + { 0, -2},
             }
         }
 
