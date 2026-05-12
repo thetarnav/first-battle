@@ -228,6 +228,17 @@ troop_company_idx :: proc (idx: Troop_Idx) -> Company_Idx {
 company_get :: proc (idx: Company_Idx) -> ^Company {
     return &companies[idx]
 }
+company_find_closest :: proc (side: Army_Side, pos: Vec2) -> (compi: Company_Idx, found: bool) {
+    pos := pos
+    context.user_ptr = &pos
+    return util.slice_min_proc(armies[side].units, proc (ecompi: Company_Idx) -> (val: f32, ok: bool) {
+        ecomp := company_get(ecompi)
+        if len(ecomp.alive_units) == 0 {
+            return 0, false
+        }
+        return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
+    })
+}
 troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
     cell := grid.ptr_idx_safe(&board, cell_idx) or_return
@@ -541,17 +552,7 @@ update_automatic :: proc () -> (ok: bool) {
             comp := company_get(compi)
 
             // select closest enemy company to attack
-            enemy_companies := armies[side_opposite(army.side)].units
-
-            context.user_ptr = &comp.avg_pos
-            closest_idx, found := util.slice_min_proc(enemy_companies, proc (ecompi: Company_Idx) -> (val: f32, ok: bool) {
-                ecomp := company_get(ecompi)
-                if len(ecomp.alive_units) == 0 {
-                    return 0, false
-                }
-                return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
-            })
-
+            closest_idx, found := company_find_closest(side_opposite(army.side), comp.avg_pos)
             comp.target = closest_idx if found else nil
         }
     }
@@ -602,7 +603,12 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
  
                 // arrange only the alive troops
                 alive_idx, _ := slice.binary_search(comp.alive_units, troop.info.si)
-                target_pos := each_army_goal_pos(cell_center(t), -0.2, alive_idx, len(comp.alive_units))
+                pos := cell_center(t)
+                angle: f32
+                if troop.info.side == .Enemy {
+                    angle = math.PI
+                }
+                target_pos := each_army_goal_pos(pos, angle, alive_idx, len(comp.alive_units))
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
