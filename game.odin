@@ -42,7 +42,7 @@ Company :: struct {
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
     avg_pos:     Vec2,
-    target:      union {Cell_Idx, Company_Idx},
+    target:      union #no_nil {Cell_Idx, Company_Idx},
 }
 Company_Idx :: distinct u16
 
@@ -88,12 +88,12 @@ army_enemy  := &armies[.Enemy]
 @rodata
 initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, count: int} = {
     .Player = {
-        {"one", {40, 80}, -0.2, 200},
-        {"two", {80, 60}, -0.4, 120},
+        {"one", {30, 90}, -0.2, 200},
+        {"two", {90, 80}, -0.4, 120},
     },
     .Enemy  = {
-        {"one", {40, 36}, math.PI,       200},
-        {"two", {80, 30}, math.PI - 0.2, 120},
+        {"one", {40, 26}, math.PI,       200},
+        {"two", {80, 20}, math.PI - 0.2, 120},
     },
 }
 
@@ -385,10 +385,13 @@ game_init :: proc () {
 
             army.units[ci] = compi
 
-            comp.side  = army.side
-            comp.idx   = compi
-            comp.name  = initial.name
-            comp.units = make([]Troop_Idx, initial.count)
+            comp.side   = army.side
+            comp.idx    = compi
+            comp.name   = initial.name
+            comp.units  = make([]Troop_Idx, initial.count)
+
+            comp_celli := cell_idx(initial.pos)
+            comp.target = comp_celli
 
             // each troop
             for &si, i in comp.units {
@@ -402,7 +405,7 @@ game_init :: proc () {
                 s.info.si    = si
                 s.info.compi = compi
 
-                pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
+                pos := each_army_goal_pos(cell_center(comp_celli), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
 
                 s.movement.path = make(type_of(s.movement.path))
@@ -478,7 +481,7 @@ update_companies :: proc () -> (ok: bool) {
             if target_idx, has_target := comp.target.(Company_Idx); has_target {
                 target_company := company_get(target_idx)
                 if len(target_company.alive_units) == 0 {
-                    comp.target = nil
+                    comp.target = cell_idx_from_pos(comp.avg_pos)
                 }
             }
         }
@@ -550,10 +553,7 @@ update_automatic :: proc () -> (ok: bool) {
 
         for compi in army.units {
             comp := company_get(compi)
-
-            // select closest enemy company to attack
-            closest_idx, found := company_find_closest(side_opposite(army.side), comp.avg_pos)
-            comp.target = closest_idx if found else nil
+            comp.target = company_find_closest(side_opposite(army.side), comp.avg_pos) or_continue
         }
     }
 
@@ -595,9 +595,6 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             comp := company_get(troop.info.compi)
 
             switch t in comp.target {
-            case nil:
-                // drop target
-                troop.movement.target = nil
             case Cell_Idx:
                 // go to closest available cell to target cell
  
@@ -607,6 +604,9 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 angle: f32
                 if troop.info.side == .Enemy {
                     angle = math.PI
+                }
+                if closest, found := company_find_closest(side_opposite(troop.info.side), pos); found {
+                    angle = vec2_angle(pos, company_get(closest).avg_pos) - math.PI/2
                 }
                 target_pos := each_army_goal_pos(pos, angle, alive_idx, len(comp.alive_units))
 
