@@ -194,7 +194,8 @@ army_count_dim :: proc (n: int) -> (res: [2]int) {
 
 each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
     dim := army_count_dim(n)
-    p = Vec2{f32(i%dim.x), f32(i/dim.x)} * 2
+    xy := [2]int{i%dim.x, i/dim.x} - dim/2
+    p = Vec2(xy) * 2
     p = vec2_rotate_angle(p, rot)
     p += origin
     p = la.floor(p)
@@ -302,7 +303,7 @@ troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: 
         return true
     }
 
-    new := troop.pos + (diff * dt * 0.02)
+    new := troop.pos + (diff * dt * 0.01)
     if la.is_nan(new) != false {
         return false
     }
@@ -529,8 +530,10 @@ update_automatic :: proc () -> (ok: bool) {
         for &comp in army.units {
 
             // select closest enemy company to attack
+            enemy_companies := armies[side_opposite(army.side)].units
+
             context.user_ptr = &comp.avg_pos
-            closest_idx, found := util.slice_min_idx_proc(armies[side_opposite(army.side)].units, proc (ecomp: Company) -> (val: f32, ok: bool) {
+            closest_idx, found := util.slice_min_idx_proc(enemy_companies, proc (ecomp: Company) -> (val: f32, ok: bool) {
                 if len(ecomp.alive_units) == 0 {
                     return 0, false
                 }
@@ -685,10 +688,10 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
             // pathfind in a limited fragment of the board
             slice_rect := rect_int_from_points({troop_coord, target_coord})
-            slice_rect  = rect_int_extend(slice_rect, 10)
+            slice_rect  = rect_int_extend(slice_rect, 12)
             slice_rect  = rect_int_clamp(slice_rect, {0, board.size})
 
-            walls := grid.make_empty(bool, slice_rect.size)
+            walls := grid.make_empty(bool, slice_rect.size, allocator=context.temp_allocator)
             for &w, i in grid.slice(walls) {
                 board_coord := grid.coord(walls, i) + slice_rect
                 board_idx   := cell_idx(board_coord)
@@ -807,6 +810,33 @@ frame :: proc (dt: f32) -> bool {
         k2.draw_circle(pos, size, c)
     }
 
+    // draw company targets
+    for army in armies {
+        for company in army.units {
+            if len(company.alive_units) == 0 do continue
+
+            start := company.avg_pos
+            end   := company.avg_pos
+
+            switch t in company.target {
+            case Cell_Idx:
+                end = cell_center(t)
+            case Company_Handle:
+                tcompany := company_from_handle(t)
+                end = tcompany.avg_pos
+            }
+
+            start = world_pos_to_screen(start)
+            end   = world_pos_to_screen(end)
+
+            if start == end {
+                draw_cross(start, k2.YELLOW)
+            } else {
+                k2.draw_line(start, end, 2, k2.YELLOW)
+            }
+        }
+    }
+
     // selected company outline
     if selected, is_selected := selected_company.?; is_selected {
 
@@ -841,7 +871,7 @@ frame :: proc (dt: f32) -> bool {
     mouse_pos := k2.get_mouse_position()
     draw_cross(mouse_pos, k2.GREEN)
 
-    draw_cross(window_size/2, k2.YELLOW)
+    draw_cross(window_size/2, k2.GRAY)
 
     // p: Coord
     // N :: 1000
