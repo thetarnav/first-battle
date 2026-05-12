@@ -32,29 +32,26 @@ Army :: struct {
     side:     Army_Side,
     name:     string,
     color:    Color,
-    units:    []Company,
+    units:    []Company_Idx,
 }
 
 Company :: struct {
+    side:        Army_Side,
+    idx:         Company_Idx,
     name:        string,
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
     avg_pos:     Vec2,
-    target:      union {Cell_Idx, Company_Handle},
+    target:      union {Cell_Idx, Company_Idx},
 }
 Company_Idx :: distinct u16
-
-Company_Handle :: struct {
-    side: Army_Side,
-    idx:  Company_Idx,
-}
 
 Troop :: struct {
 
     info: struct {
         si:       Troop_Idx,
         side:     Army_Side,
-        ci:       Company_Idx,
+        compi:    Company_Idx,
     },
 
     pos: Vec2,
@@ -102,14 +99,15 @@ initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, cou
 
 automatic := [Army_Side]bool{
     .Player = false,
-    .Enemy  = true,
+    .Enemy  = false,
 }
 is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 
 troops: Troop_Arr
+companies: [dynamic]Company
 
 hovered_troop: Maybe(Troop_Idx)
-selected_company: Maybe(Company_Handle)
+selected_company: Maybe(Company_Idx)
 
 board: grid.Grid(Cell)
 
@@ -223,15 +221,12 @@ troop_is_dead :: proc (idx: Troop_Idx) -> bool {
 troop_is_alive :: proc (idx: Troop_Idx) -> bool {
     return !troop_is_dead(idx)
 }
-troop_company_handle :: proc (idx: Troop_Idx) -> Company_Handle {
+troop_company_idx :: proc (idx: Troop_Idx) -> Company_Idx {
     troop := troop_get(idx)
-    return Company_Handle{
-        side = troop.info.side,
-        idx  = troop.info.ci,
-    }
+    return troop.info.compi
 }
-company_from_handle :: proc (handle: Company_Handle) -> ^Company {
-    return &armies[handle.side].units[handle.idx]
+company_get :: proc (idx: Company_Idx) -> ^Company {
+    return &companies[idx]
 }
 troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
@@ -368,27 +363,33 @@ game_init :: proc () {
     for &army in armies {
         initials := initial_army_units[army.side]
 
-        army.units = make([]Company, len(initials))
+        army.units = make([]Company_Idx, len(initials))
 
         // each company
-        for initial, ci_int in initials {
-            ci := Company_Idx(ci_int)
-            company := &army.units[ci]
+        for initial, ci in initials {
 
-            company.name  = initial.name
-            company.units = make([]Troop_Idx, initial.count)
+            append_nothing(&companies)
+            compi := Company_Idx(len(companies)-1)
+            comp  := company_get(compi)
+
+            army.units[ci] = compi
+
+            comp.side  = army.side
+            comp.idx   = compi
+            comp.name  = initial.name
+            comp.units = make([]Troop_Idx, initial.count)
 
             // each troop
-            for &si, i in company.units {
+            for &si, i in comp.units {
 
                 si = Troop_Idx(len(troops))
-                company.units[i] = si
+                comp.units[i] = si
                 append_nothing_soa(&troops)
 
                 s := troop_get(si)
-                s.info.side = army.side
-                s.info.si   = si
-                s.info.ci   = ci
+                s.info.side  = army.side
+                s.info.si    = si
+                s.info.compi = compi
 
                 pos := each_army_goal_pos(Vec2(initial.pos) + Vec2(0.5), initial.rot, i, initial.count)
                 troop_set_pos_force(s, pos)
@@ -433,13 +434,14 @@ update_companies :: proc () -> (ok: bool) {
 
     // update alive units array and average company position
     for army in armies {
-        for &company in army.units {
+        for compi in army.units {
+            comp := company_get(compi)
 
-            alive_units := make([dynamic]Troop_Idx, 0, len(company.units), allocator=context.temp_allocator)
+            alive_units := make([dynamic]Troop_Idx, 0, len(comp.units), allocator=context.temp_allocator)
 
             sum_pos: Vec2
 
-            for uidx in company.units {
+            for uidx in comp.units {
                 ucell := troop_cell(uidx)
 
                 if troop_is_alive(uidx) {
@@ -452,18 +454,20 @@ update_companies :: proc () -> (ok: bool) {
             }
 
             shrink(&alive_units)
-            company.alive_units = alive_units[:]
-            company.avg_pos     = sum_pos/f32(len(alive_units))
+            comp.alive_units = alive_units[:]
+            comp.avg_pos     = sum_pos/f32(len(alive_units))
         }
     }
 
     // don't target dead company
     for army in armies {
-        for &company in army.units {
-            if target_handle, has_target := company.target.(Company_Handle); has_target {
-                target_company := company_from_handle(target_handle)
+        for compi in army.units {
+            comp := company_get(compi)
+
+            if target_idx, has_target := comp.target.(Company_Idx); has_target {
+                target_company := company_get(target_idx)
                 if len(target_company.alive_units) == 0 {
-                    company.target = nil
+                    comp.target = nil
                 }
             }
         }
@@ -471,7 +475,7 @@ update_companies :: proc () -> (ok: bool) {
 
     // disselect dead company
     if selected, is_selected := selected_company.?; is_selected {
-        company := company_from_handle(selected)
+        company := company_get(selected)
         if len(company.alive_units) == 0 {
             selected_company = nil
         }
@@ -487,30 +491,33 @@ update_click :: proc () -> (ok: bool) {
     // ignore clicks outside of the grid
     cell_idx := cell_idx_from_pos(mouse_world) or_return
 
-    if si, hovering_troop := hovered_troop.?; hovering_troop {
+    if troopi, hovering_troop := hovered_troop.?; hovering_troop {
         // company target
 
-        company_handle := troop_company_handle(si)
+        compi := troop_company_idx(troopi)
+        comp  := company_get(compi)
 
         switch selected_company {
         case nil:
-            if is_automatic(company_handle.side) {
+            if is_automatic(comp.side) {
                 // cannot select automatic side
             } else {
                 // select
-                selected_company = company_handle
+                selected_company = compi
             }
-        case company_handle:
+        case compi:
             // dissellect
             selected_company = nil
         case:
-            selected := selected_company.(Company_Handle)
-            if selected.side == company_handle.side {
+            selected_compi := selected_company.(Company_Idx)
+            selected_comp  := company_get(selected_compi)
+
+            if selected_comp.side == comp.side {
                 // select same side
-                selected_company = company_handle
+                selected_company = compi
             } else {
                 // attack opposite side
-                company_from_handle(selected).target = company_handle
+                selected_comp.target = compi
                 selected_company = nil // disselect after action
             }
         }
@@ -518,7 +525,7 @@ update_click :: proc () -> (ok: bool) {
     else if selected, is_selected := selected_company.?; is_selected {
         // cell target
 
-        company_from_handle(selected).target = cell_idx
+        company_get(selected).target = cell_idx
         selected_company = nil // disselect after action
     }
 
@@ -530,24 +537,22 @@ update_automatic :: proc () -> (ok: bool) {
     for army in armies {
         is_automatic(army.side) or_continue
 
-        for &comp in army.units {
+        for compi in army.units {
+            comp := company_get(compi)
 
             // select closest enemy company to attack
             enemy_companies := armies[side_opposite(army.side)].units
 
             context.user_ptr = &comp.avg_pos
-            closest_idx, found := util.slice_min_idx_proc(enemy_companies, proc (ecomp: Company) -> (val: f32, ok: bool) {
+            closest_idx, found := util.slice_min_proc(enemy_companies, proc (ecompi: Company_Idx) -> (val: f32, ok: bool) {
+                ecomp := company_get(ecompi)
                 if len(ecomp.alive_units) == 0 {
                     return 0, false
                 }
                 return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
             })
 
-            if found {
-                comp.target = Company_Handle{side = side_opposite(army.side), idx = Company_Idx(closest_idx)}
-            } else {
-                comp.target = nil
-            }
+            comp.target = closest_idx if found else nil
         }
     }
 
@@ -586,9 +591,9 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         update_target: if time_to_update {
             // update troop's target based on the current company target
 
-            company := company_from_handle(troop_company_handle(si))
+            comp := company_get(troop.info.compi)
 
-            switch t in company.target {
+            switch t in comp.target {
             case nil:
                 // drop target
                 troop.movement.target = nil
@@ -596,8 +601,8 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 // go to closest available cell to target cell
  
                 // arrange only the alive troops
-                alive_idx, _ := slice.binary_search(company.alive_units, troop.info.si)
-                target_pos := each_army_goal_pos(cell_center(t), -0.2, alive_idx, len(company.alive_units))
+                alive_idx, _ := slice.binary_search(comp.alive_units, troop.info.si)
+                target_pos := each_army_goal_pos(cell_center(t), -0.2, alive_idx, len(comp.alive_units))
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
@@ -605,7 +610,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                     troop.movement.target = cell_idx_safe(coord) or_continue
                     break
                 }
-            case Company_Handle:
+            case Company_Idx:
                 // go to closest available troop from target company
 
                 // already next to an enemy
@@ -613,7 +618,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
                     cidx   := cell_idx_safe(troop_coord + dir) or_continue
                     ctroop := cell_troop(cidx) or_continue
-                    if troop_company_handle(ctroop.info.si) != t do continue
+                    if ctroop.info.compi != t do continue
 
                     attack(troop, ctroop) or_continue
                     troop.movement.target = cidx
@@ -621,17 +626,17 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                     continue update_troops
                 }
 
-                target_company := company_from_handle(t)
+                tcomp := company_get(t)
 
                 // find closest enemy troop
                 context.user_ptr = &troop.pos
-                closest_idx := util.slice_min_proc(target_company.units, proc (uidx: Troop_Idx) -> f32 {
+                closest_idx := util.slice_min_proc(tcomp.units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
                     troop_pos := (^Vec2)(context.user_ptr)^
 
                     utroop := troop_get(uidx)
                     ucoord := troop_get_coord(uidx)
 
-                    if troop_is_dead(uidx) do return math.inf_f32(1) // skip
+                    troop_is_alive(uidx) or_return
 
                     is_accessable: {
                         for dir in grid.DIRECTION_VECTORS {
@@ -642,10 +647,10 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                             }
                         }
 
-                        return math.inf_f32(1) // skip
+                        return 0, false
                     }
 
-                    return la.distance(troop_pos, utroop.pos)
+                    return la.distance(troop_pos, utroop.pos), true
                 }) or_break
 
                 closest_coord := troop_get_coord(closest_idx)
@@ -815,18 +820,20 @@ frame :: proc (dt: f32) -> bool {
 
     // draw company targets
     for army in armies {
-        for company in army.units {
-            if len(company.alive_units) == 0 do continue
+        for compi in army.units {
+            comp := company_get(compi)
 
-            start := company.avg_pos
-            end   := company.avg_pos
+            if len(comp.alive_units) == 0 do continue
 
-            switch t in company.target {
+            start := comp.avg_pos
+            end   := comp.avg_pos
+
+            switch t in comp.target {
             case Cell_Idx:
                 end = cell_center(t)
-            case Company_Handle:
-                tcompany := company_from_handle(t)
-                end = tcompany.avg_pos
+            case Company_Idx:
+                tcomp := company_get(t)
+                end = tcomp.avg_pos
             }
 
             start = world_pos_to_screen(start)
@@ -841,19 +848,18 @@ frame :: proc (dt: f32) -> bool {
     }
 
     // selected company outline
-    if selected, is_selected := selected_company.?; is_selected {
+    if compi, is_selected := selected_company.?; is_selected {
+        comp := company_get(compi)
 
-        company := armies[selected.side].units[selected.idx]
-
-        points := make([dynamic]Vec2, 0, len(company.units), allocator=context.temp_allocator)
-        for si in company.alive_units {
+        points := make([dynamic]Vec2, 0, len(comp.units), allocator=context.temp_allocator)
+        for si in comp.alive_units {
             append(&points, troop_get(si).pos)
         }
 
         outline := convex_hull(points[:], allocator=context.temp_allocator)
 
-        if len(outline) < 3 && len(company.alive_units) > 0 {
-            s := troop_get(company.alive_units[0])
+        if len(outline) < 3 && len(comp.alive_units) > 0 {
+            s := troop_get(comp.alive_units[0])
             p := s.pos
             outline = {
                 p + {+4, +2},

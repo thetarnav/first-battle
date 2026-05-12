@@ -272,19 +272,23 @@ Returns:
 - ok: True if the slice is non-empty, false otherwise.
 */
 @(require_results)
-slice_min_proc :: proc(s: $S/[]$T, f: proc(T) -> $V) -> (res: T, ok: bool) where intrinsics.type_is_ordered(V) #optional_ok {
-	if len(s) != 0 {
-		res = s[0]
-		ok = true
-		min_val := f(res)
-		for v in s[1:] {
-			val := f(v)
-			if val < min_val {
-				res = v
-				min_val = val
-			}
-		}
-	}
+slice_min_proc :: proc(s: $S/[]$T, f: proc(T) -> (val: $V, ok: bool)) -> (res: T, ok: bool) where intrinsics.type_is_ordered(V) #optional_ok {
+    min_val: V
+    i := 0
+    for ; i < len(s); i += 1 {
+        v := s[i]
+        min_val = f(v) or_continue
+        res, ok = v, true
+        break
+    }
+    for ; i < len(s); i += 1 {
+        v := s[i]
+        val := f(v) or_continue
+        if val < min_val {
+            res = v
+            min_val = val
+        }
+    }
 	return
 }
 
