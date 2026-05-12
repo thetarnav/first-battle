@@ -193,6 +193,9 @@ army_count_dim :: proc (n: int) -> (res: [2]int) {
 }
 
 each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
+    if n < 2 {
+        return origin
+    }
     dim := army_count_dim(n)
     xy := [2]int{i%dim.x, i/dim.x} - dim/2
     p = Vec2(xy) * 2
