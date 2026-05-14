@@ -40,8 +40,7 @@ step :: proc () -> bool {
 
     time_now_update  := time_now()
     dt_update        := time_now_update - time_last_update
-    // capped_dt       := min(dt, MAX_DT*2)
-    capped_dt_update := dt_update
+    capped_dt_update := min(dt_update, MAX_DT*2)
 
     time_last_update = time_now_update
     update(capped_dt_update) or_return
@@ -52,7 +51,7 @@ step :: proc () -> bool {
     time_now_frame   := time_now()
     dt_frame         := time_now_frame - time_last_frame
     elapsed_frame    := dt_frame  + time_miss_frame
-    capped_dt_frame  := dt_frame
+    capped_dt_frame  := min(dt_frame, MAX_DT*2)
 
     if elapsed_frame < MAX_DT {
         return true

@@ -35,10 +35,16 @@ Army :: struct {
     units:    []Company_Idx,
 }
 
+Unit_Kind :: enum u8 {
+    Infantry,
+    Heavy,
+    Riders,
+}
 Company :: struct {
     side:        Army_Side,
     idx:         Company_Idx,
     name:        string,
+    kind:        Unit_Kind,
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
     avg_pos:     Vec2,
@@ -49,9 +55,9 @@ Company_Idx :: distinct u16
 Troop :: struct {
 
     info: struct {
-        si:       Troop_Idx,
-        side:     Army_Side,
-        compi:    Company_Idx,
+        si:    Troop_Idx,
+        side:  Army_Side,
+        compi: Company_Idx,
     },
 
     pos: Vec2,
@@ -66,6 +72,7 @@ Troop :: struct {
         path:        [dynamic]Cell_Idx,
         prefer:      enum {Target, Path},
         time_left:   f32,
+        velocity:    Vec2,
     },
 }
 Troop_Idx :: distinct u16
@@ -86,15 +93,30 @@ army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
 @rodata
-initial_army_units: [Army_Side][]struct {name: string, pos: Coord, rot: f32, count: int} = {
+initial_army_units: [Army_Side][]struct {name: string, kind: Unit_Kind, pos: Coord, rot: f32, count: int} = {
     .Player = {
-        {"one", {30, 90}, -0.2, 200},
-        {"two", {90, 80}, -0.4, 120},
+        {"one", .Infantry, {23, 90}, -0.2, 200},
+        {"two", .Heavy,    {60, 80}, -0.4, 120},
+        {"thr", .Riders,   {100, 80}, -0.4, 120},
     },
     .Enemy  = {
-        {"one", {40, 26}, math.PI,       200},
-        {"two", {80, 20}, math.PI - 0.2, 120},
+        {"one", .Infantry, {23, 26}, math.PI,       200},
+        {"two", .Heavy,    {60, 20}, math.PI - 0.2, 120},
+        {"thr", .Riders,   {100, 30}, math.PI - 0.4, 120},
     },
+}
+
+Unit_Config :: struct {
+    color:      color.RGB,
+    accel:      f32,
+    frict:      f32,
+    dmg_move:   f32,
+    dmg_static: f32,
+}
+unit_config := [Unit_Kind]Unit_Config{
+    .Infantry = {color={220, 180, 160}, accel=0.000034,  frict=0.99,   dmg_static=0.1, dmg_move=0.16},
+    .Heavy    = {color={120, 140, 120}, accel=0.000024,  frict=0.99,   dmg_static=0.2, dmg_move=0.1},
+    .Riders   = {color={230, 120,  20}, accel=0.000038, frict=0.9966, dmg_static=0.1, dmg_move=0.4},
 }
 
 automatic := [Army_Side]bool{
@@ -128,7 +150,6 @@ BOARD_RECT_MARGIN :: 10
 
 TROOP_W :: 4
 TROOP_M :: 3
-TROOP_S :: TROOP_W + TROOP_M*2
 
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
@@ -225,6 +246,9 @@ troop_company_idx :: proc (idx: Troop_Idx) -> Company_Idx {
     troop := troop_get(idx)
     return troop.info.compi
 }
+troop_config :: proc (idx: Troop_Idx) -> Unit_Config {
+    return unit_config[company_get(troop_company_idx(idx)).kind]
+}
 company_get :: proc (idx: Company_Idx) -> ^Company {
     return &companies[idx]
 }
@@ -262,62 +286,58 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     cell.troop = s.info.si
     return true
 }
-troop_set_pos :: proc (troop: Troop_Ptr, pos: Vec2) -> (ok: bool) {
+calc_intention :: proc (troop: Troop_Ptr, e_idx: Cell_Idx) -> (intention: Vec2, at_target: bool) {
 
-    cell_idx := cell_idx_from_pos(pos) or_return
-
-    if troop_add_to_cell(troop, cell_idx) {
-        // added to next cell (or same)
-        troop.pos = pos
-    } else {
-        // move in current cell up to the cell border
-        cell_idx = cell_idx_from_pos(troop.pos)
-        pos := rect_clamp_point_exclusive(cell_rect(cell_idx), pos)
-        assert(cell_idx == cell_idx_from_pos(pos))
-        if troop.pos == pos {
-            return false // cannot move further
-        }
-        troop.pos = pos
-    }
-
-    return true
-}
-troop_move_towards :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (ok: bool) {
-
-    s_idx, _ := cell_idx_from_pos(troop.pos)
+    s_idx := cell_idx_from_pos(troop.pos)
 
     s_coord := cell_coord(s_idx)
     e_coord := cell_coord(e_idx)
 
     s_pos := troop.pos
-    e_pos := Vec2(e_coord) + Vec2(0.5)
+    e_pos := cell_center(e_idx)
 
     diff := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
 
     // in fight is slower
     diff /= Vec2(troop.combat.in_fight+1)
-    troop.combat.in_fight = max(troop.combat.in_fight - 1 * dt, 0)
 
     // slow down damaged troops
-    diff *= Vec2((1 - troop.combat.dmg_taken)/2 + 0.5)
+    diff *= Vec2((1-troop.combat.dmg_taken)*0.6 + 0.4)
 
     // slower on corpses
     if cell_corpse(s_idx) {
         diff *= 0.75
     }
 
-    // end
-    if la.length(diff) < 0.01 && s_coord == e_coord {
-        troop.pos = e_pos
-        return true
+    return diff, la.length(diff) < 0.01 && s_coord == e_coord
+}
+troop_apply_force :: proc (troop: Troop_Ptr, intention: Vec2, dt: f32) -> (collision: Maybe(Cell_Idx), moved: bool) {
+
+    config := unit_config[company_get(troop.info.compi).kind]
+
+    troop.movement.velocity += intention * config.accel * dt // accelleration
+
+    velocity := troop.movement.velocity * dt
+    next_pos := troop.pos + velocity
+
+    next_celli := cell_idx_from_pos(next_pos) or_return
+
+    if troop_add_to_cell(troop, next_celli) {
+        // added to next cell (or same)
+        troop.pos = next_pos
+    } else {
+        // move in current cell up to the cell border
+        next_celli = cell_idx_from_pos(troop.pos)
+        pos := rect_clamp_point_exclusive(cell_rect(next_celli), next_pos)
+        assert(next_celli == cell_idx_from_pos(pos))
+        if troop.pos == pos {
+            return next_celli, false // cannot move further
+        }
+        troop.pos = pos
+        return next_celli, true
     }
 
-    new := troop.pos + (diff * dt * 0.01)
-    if la.is_nan(new) != false {
-        return false
-    }
-
-    return troop_set_pos(troop, new)
+    return nil, true
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
@@ -387,6 +407,7 @@ game_init :: proc () {
 
             comp.side   = army.side
             comp.idx    = compi
+            comp.kind   = initial.kind
             comp.name   = initial.name
             comp.units  = make([]Troop_Idx, initial.count)
 
@@ -562,6 +583,15 @@ update_automatic :: proc () -> (ok: bool) {
 
 update_troops :: proc (dt: f32) -> (ok: bool) {
 
+    for _, i in troops {
+        si := Troop_Idx(i)
+        troop := &troops[si]
+
+        if troop_is_dead(si) do continue
+
+        troop.combat.in_fight = 0
+    }
+
     update_troops:
     for _, i in troops {
         si := Troop_Idx(i)
@@ -572,18 +602,27 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
 
+        troop_comp := company_get(troop.info.compi)
+        troop_config := unit_config[troop_comp.kind]
+
         troop.movement.time_left -= dt
         time_to_update := troop.movement.time_left <= 0
         if time_to_update {
             troop.movement.time_left = rand.float32_range(200, 600)
         }
 
+        troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
+
         attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
             if enemy.info.side == troop.info.side do return
             if troop_is_dead(enemy.info.si) do return
 
+            config := troop_config(troop.info.si)
+
+            dmg := config.dmg_static + config.dmg_move * la.length(troop.movement.velocity)
+
             enemy.combat.in_fight  += 0.8
-            enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + 0.1, 1)
+            enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
             troop.combat.in_fight  += 1
 
             return true
@@ -592,14 +631,12 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         update_target: if time_to_update {
             // update troop's target based on the current company target
 
-            comp := company_get(troop.info.compi)
-
-            switch t in comp.target {
+            switch t in troop_comp.target {
             case Cell_Idx:
                 // go to closest available cell to target cell
  
                 // arrange only the alive troops
-                alive_idx, _ := slice.binary_search(comp.alive_units, troop.info.si)
+                alive_idx, _ := slice.binary_search(troop_comp.alive_units, troop.info.si)
                 pos := cell_center(t)
                 angle: f32
                 if troop.info.side == .Enemy {
@@ -608,7 +645,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 if closest, found := company_find_closest(side_opposite(troop.info.side), pos); found {
                     angle = vec2_angle(pos, company_get(closest).avg_pos) - math.PI/2
                 }
-                target_pos := each_army_goal_pos(pos, angle, alive_idx, len(comp.alive_units))
+                target_pos := each_army_goal_pos(pos, angle, alive_idx, len(troop_comp.alive_units))
 
                 for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
@@ -628,7 +665,8 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
                     attack(troop, ctroop) or_continue
                     troop.movement.target = cidx
-                    troop_move_towards(troop, troop_cell_idx, dt)
+                    intention, _ := calc_intention(troop, troop_cell_idx)
+                    troop_apply_force(troop, intention, dt)
                     continue update_troops
                 }
 
@@ -682,12 +720,35 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             // try moving towards the target directly
 
             next := troop_coord + la.sign(target_coord-troop_coord)
-            next_idx := cell_idx(next)
+            next_idx  := cell_idx(next)
             next_cell := cell_get(next_idx)
-            if next_cell.troop != nil do break direct
+            if next_cell.troop != nil {
+                // troop.movement.prefer = .Path
+                break direct
+            }
 
             troop.movement.prefer = .Target
-            if troop_move_towards(troop, target, dt) do continue
+            intention, at_target := calc_intention(troop, target)
+            if at_target {
+                troop.pos = cell_center(target)
+                // troop.movement.velocity = 0
+                continue update_troops
+            }
+            collision, moved := troop_apply_force(troop, intention, dt)
+            if moved {
+                continue update_troops
+            }
+            if collision_idx, collided := collision.?; collided {
+                // collision with enemy - apply speed-based damage
+                intended_pos := troop.pos + troop.movement.velocity
+                if cidx, ok := cell_idx_from_pos(intended_pos); ok {
+                    if occupant_idx, occupied := cell_get(cidx).troop.?; occupied && troop_is_alive(occupant_idx) {
+                        attack(troop, troop_get(occupant_idx))
+                    }
+                }
+            }
+            troop.movement.prefer = .Path
+            continue update_troops
         }
 
         pathfind:
@@ -736,11 +797,28 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
             next := troop.movement.path[0]
 
-            if troop_cell_idx == next {
+            intention, at_target := calc_intention(troop, next)
+            if at_target {
                 pop_front(&troop.movement.path)
+                if len(troop.movement.path) == 0 {
+                    troop.movement.prefer = .Target
+                }
+                continue update_troops
             }
-
-            if troop_move_towards(troop, next, dt) do continue
+            collision, moved := troop_apply_force(troop, intention, dt)
+            if moved {
+                continue update_troops
+            }
+            if collision_idx, collided := collision.?; collided {
+                // collision with enemy - apply speed-based damage
+                intended_pos := troop.pos + troop.movement.velocity
+                if cidx, ok := cell_idx_from_pos(intended_pos); ok {
+                    if occupant_idx, occupied := cell_get(cidx).troop.?; occupied && troop_is_alive(occupant_idx) {
+                        attack(troop, troop_get(occupant_idx))
+                    }
+                }
+            }
+            continue update_troops
         }
 
         if time_to_update {
@@ -752,7 +830,13 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             }
         }
 
-        troop_move_towards(troop, troop_cell_idx, dt)
+        // fallback: move to center of own cell
+        intention, at_target := calc_intention(troop, troop_cell_idx)
+        if at_target {
+            troop.pos = cell_center(troop_cell_idx)
+        } else {
+            troop_apply_force(troop, intention, dt)
+        }
     }
 
     return true
@@ -814,8 +898,10 @@ frame :: proc (dt: f32) -> bool {
 
         // color := army_player.color
         size := f32(TROOP_W)
-        c := armies[troop.info.side].color
-        c = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken/2)
+        army_color := armies[troop.info.side].color
+        kind_color := troop_config(si).color
+        c := color.lerp(army_color, color.rgba(kind_color), 0.5)
+        c  = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
             c = k2.BLUE
