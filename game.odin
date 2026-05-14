@@ -115,9 +115,9 @@ Unit_Config :: struct {
     armor:      f32,
 }
 unit_config := [Unit_Kind]Unit_Config{
-    .Infantry = {color={230, 190, 180}, accel=0.000034, frict=0.992,  dmg_static=0.1,  dmg_move=16,  armor=0.7},
-    .Heavy    = {color={120, 120, 110}, accel=0.000024, frict=0.99,   dmg_static=0.22, dmg_move=10,  armor=3},
-    .Riders   = {color={180, 180,  20}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
+    .Infantry = {color={230, 200, 190}, accel=0.000034, frict=0.992,  dmg_static=0.1,  dmg_move=16,  armor=0.7},
+    .Heavy    = {color={110, 110, 100}, accel=0.000024, frict=0.99,   dmg_static=0.22, dmg_move=10,  armor=3},
+    .Riders   = {color={180, 180,  50}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
 }
 
 automatic := [Army_Side]bool{
@@ -287,7 +287,7 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     cell.troop = s.info.si
     return true
 }
-calc_intention :: proc (troop: Troop_Ptr, e_idx: Cell_Idx) -> (intention: Vec2, at_target: bool) {
+troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (collision: Maybe(Cell_Idx), moved: bool) {
 
     s_idx := cell_idx_from_pos(troop.pos)
 
@@ -310,13 +310,13 @@ calc_intention :: proc (troop: Troop_Ptr, e_idx: Cell_Idx) -> (intention: Vec2, 
         diff *= 0.75
     }
 
-    return diff, la.length(diff) < 0.01 && s_coord == e_coord
-}
-troop_apply_force :: proc (troop: Troop_Ptr, intention: Vec2, dt: f32) -> (collision: Maybe(Cell_Idx), moved: bool) {
+    if la.length(diff) < 0.01 && s_coord == e_coord {
+        return nil, true
+    }
 
     config := unit_config[company_get(troop.info.compi).kind]
 
-    troop.movement.velocity += intention * config.accel * dt // accelleration
+    troop.movement.velocity += diff * config.accel * dt // accelleration
 
     velocity := troop.movement.velocity * dt
     next_pos := troop.pos + velocity
@@ -664,8 +664,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
                     attack(troop, ctroop) or_continue
                     troop.movement.target = cidx
-                    intention, _ := calc_intention(troop, troop_cell_idx)
-                    troop_apply_force(troop, intention, dt)
+                    troop_apply_force(troop, troop_cell_idx, dt)
                     continue update_troops
                 }
 
@@ -727,26 +726,16 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             }
 
             troop.movement.prefer = .Target
-            intention, at_target := calc_intention(troop, target)
-            if at_target {
-                troop.pos = cell_center(target)
-                // troop.movement.velocity = 0
-                continue update_troops
-            }
-            collision, moved := troop_apply_force(troop, intention, dt)
-            if moved {
-                continue update_troops
-            }
+            collision, moved := troop_apply_force(troop, target, dt)
+            // collision with enemy - apply speed-based damage
             if collision_idx, collided := collision.?; collided {
-                // collision with enemy - apply speed-based damage
-                intended_pos := troop.pos + troop.movement.velocity
-                if cidx, ok := cell_idx_from_pos(intended_pos); ok {
-                    if occupant_idx, occupied := cell_get(cidx).troop.?; occupied && troop_is_alive(occupant_idx) {
-                        attack(troop, troop_get(occupant_idx))
-                    }
+                if occupant, occupied := cell_troop(collision_idx); occupied {
+                    attack(troop, occupant)
                 }
             }
-            troop.movement.prefer = .Path
+            if !moved {
+                troop.movement.prefer = .Path
+            }
             continue update_troops
         }
 
@@ -795,26 +784,20 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             }
 
             next := troop.movement.path[0]
-
-            intention, at_target := calc_intention(troop, next)
-            if at_target {
+            if troop_cell_idx == next {
                 pop_front(&troop.movement.path)
-                if len(troop.movement.path) == 0 {
+                if len(troop.movement.path) > 0 {
+                    next = troop.movement.path[0]
+                } else {
                     troop.movement.prefer = .Target
+                    break by_path
                 }
-                continue update_troops
             }
-            collision, moved := troop_apply_force(troop, intention, dt)
-            if moved {
-                continue update_troops
-            }
+
+            collision, moved := troop_apply_force(troop, next, dt)
             if collision_idx, collided := collision.?; collided {
-                // collision with enemy - apply speed-based damage
-                intended_pos := troop.pos + troop.movement.velocity
-                if cidx, ok := cell_idx_from_pos(intended_pos); ok {
-                    if occupant_idx, occupied := cell_get(cidx).troop.?; occupied && troop_is_alive(occupant_idx) {
-                        attack(troop, troop_get(occupant_idx))
-                    }
+                if occupant, occupied := cell_troop(collision_idx); occupied {
+                    attack(troop, occupant)
                 }
             }
             continue update_troops
@@ -830,12 +813,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         }
 
         // fallback: move to center of own cell
-        intention, at_target := calc_intention(troop, troop_cell_idx)
-        if at_target {
-            troop.pos = cell_center(troop_cell_idx)
-        } else {
-            troop_apply_force(troop, intention, dt)
-        }
+        troop_apply_force(troop, troop_cell_idx, dt)
     }
 
     return true
