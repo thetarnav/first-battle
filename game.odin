@@ -95,13 +95,13 @@ army_enemy  := &armies[.Enemy]
 @rodata
 initial_army_units: [Army_Side][]struct {name: string, kind: Unit_Kind, pos: Coord, rot: f32, count: int} = {
     .Player = {
-        {"one", .Infantry, {23, 90}, -0.2, 200},
-        {"two", .Heavy,    {60, 80}, -0.4, 120},
-        {"thr", .Riders,   {100, 80}, -0.4, 120},
+        {"one", .Infantry, {23,  100}, -0.2, 200},
+        {"two", .Heavy,    {60,  90},  -0.4, 120},
+        {"thr", .Riders,   {100, 90},  -0.4, 120},
     },
     .Enemy  = {
-        {"one", .Infantry, {23, 26}, math.PI,       200},
-        {"two", .Heavy,    {60, 20}, math.PI - 0.2, 120},
+        {"one", .Infantry, {23,  26}, math.PI,       200},
+        {"two", .Heavy,    {60,  20}, math.PI - 0.2, 120},
         {"thr", .Riders,   {100, 30}, math.PI - 0.4, 120},
     },
 }
@@ -112,11 +112,12 @@ Unit_Config :: struct {
     frict:      f32,
     dmg_move:   f32,
     dmg_static: f32,
+    armor:      f32,
 }
 unit_config := [Unit_Kind]Unit_Config{
-    .Infantry = {color={220, 180, 160}, accel=0.000034,  frict=0.99,   dmg_static=0.1, dmg_move=0.16},
-    .Heavy    = {color={120, 140, 120}, accel=0.000024,  frict=0.99,   dmg_static=0.2, dmg_move=0.1},
-    .Riders   = {color={230, 120,  20}, accel=0.000038, frict=0.9966, dmg_static=0.1, dmg_move=0.4},
+    .Infantry = {color={220, 180, 160}, accel=0.000034, frict=0.99,   dmg_static=0.1, dmg_move=0.16, armor=0.8},
+    .Heavy    = {color={120, 140, 120}, accel=0.000024, frict=0.99,   dmg_static=0.2, dmg_move=0.1,  armor=2},
+    .Riders   = {color={230, 120,  20}, accel=0.000038, frict=0.9966, dmg_static=0.1, dmg_move=0.54, armor=1},
 }
 
 automatic := [Army_Side]bool{
@@ -584,11 +585,7 @@ update_automatic :: proc () -> (ok: bool) {
 update_troops :: proc (dt: f32) -> (ok: bool) {
 
     for _, i in troops {
-        si := Troop_Idx(i)
-        troop := &troops[si]
-
-        if troop_is_dead(si) do continue
-
+        troop := &troops[i]
         troop.combat.in_fight = 0
     }
 
@@ -620,6 +617,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             config := troop_config(troop.info.si)
 
             dmg := config.dmg_static + config.dmg_move * la.length(troop.movement.velocity)
+            dmg /= config.armor
 
             enemy.combat.in_fight  += 0.8
             enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
