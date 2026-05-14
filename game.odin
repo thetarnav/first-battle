@@ -86,7 +86,7 @@ Cell :: struct {
 Cell_Idx :: distinct u16
 
 armies: [Army_Side]Army = {
-    .Player = {side=.Player, name="Player", color=k2.ORANGE},
+    .Player = {side=.Player, name="Player", color=k2.BLUE},
     .Enemy  = {side=.Enemy,  name="Enemy",  color=k2.RED},
 }
 army_player := &armies[.Player]
@@ -115,9 +115,9 @@ Unit_Config :: struct {
     armor:      f32,
 }
 unit_config := [Unit_Kind]Unit_Config{
-    .Infantry = {color={220, 180, 160}, accel=0.000034, frict=0.99,   dmg_static=0.1, dmg_move=0.16, armor=0.8},
-    .Heavy    = {color={120, 140, 120}, accel=0.000024, frict=0.99,   dmg_static=0.2, dmg_move=0.1,  armor=2},
-    .Riders   = {color={230, 120,  20}, accel=0.000038, frict=0.9966, dmg_static=0.1, dmg_move=0.54, armor=1},
+    .Infantry = {color={230, 190, 180}, accel=0.000034, frict=0.992,  dmg_static=0.1,  dmg_move=16,  armor=0.7},
+    .Heavy    = {color={120, 120, 110}, accel=0.000024, frict=0.99,   dmg_static=0.22, dmg_move=10,  armor=3},
+    .Riders   = {color={180, 180,  20}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
 }
 
 automatic := [Army_Side]bool{
@@ -614,14 +614,15 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             if enemy.info.side == troop.info.side do return
             if troop_is_dead(enemy.info.si) do return
 
-            config := troop_config(troop.info.si)
+            tconfig := troop_config(troop.info.si)
+            econfig := troop_config(enemy.info.si)
 
-            dmg := config.dmg_static + config.dmg_move * la.length(troop.movement.velocity)
-            dmg /= config.armor
+            dmg := tconfig.dmg_static + tconfig.dmg_move * la.length(troop.movement.velocity)
+            dmg /= econfig.armor
 
-            enemy.combat.in_fight  += 0.8
+            enemy.combat.in_fight += 0.8
             enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
-            troop.combat.in_fight  += 1
+            troop.combat.in_fight += 1
 
             return true
         }
@@ -858,8 +859,6 @@ update :: proc (dt: f32) -> bool {
 frame :: proc (dt: f32) -> bool {
 
     k2.clear({12, 10, 9, 255})
-
-    k2.draw_text("Hellope!", {50, 50}, 100, k2.DARK_BLUE)
 
     // draw corpses
     for cell, i in grid.slice(board) {
