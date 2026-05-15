@@ -205,6 +205,10 @@ cell_troop :: proc (idx: Cell_Idx) -> (troop: Troop_Ptr, ok: bool) {
     troopi := cell.troop.? or_return
     return troop_get(troopi), true
 }
+cell_taken :: proc (idx: Cell_Idx, troopi: Troop_Idx) -> (is_taken: bool) {
+    troop := cell_troop(idx) or_return
+    return troop.info.si != troopi && troop_is_alive(troop.info.si)
+}
 cell_corpse :: proc (idx: Cell_Idx) -> (is_corpse: bool) {
     return cell_get(idx).corpse
 }
@@ -253,6 +257,9 @@ troop_company_idx :: proc (idx: Troop_Idx) -> Company_Idx {
 troop_config :: proc (idx: Troop_Idx) -> Unit_Config {
     return unit_config[company_get(troop_company_idx(idx)).kind]
 }
+troop_pos :: proc (idx: Troop_Idx) -> Vec2 {
+    return troop_get(idx).pos
+}
 company_get :: proc (idx: Company_Idx) -> ^Company {
     return &companies[idx]
 }
@@ -274,7 +281,7 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     // cell taken
     if prev_troop, cell_has_prev_troop := cell.troop.?;
        cell_has_prev_troop && prev_troop != s.info.si {
-        if  troop_is_alive(prev_troop) {
+        if troop_is_alive(prev_troop) {
             return false
         } else {
             cell.corpse = true
@@ -373,11 +380,10 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
     }
 
     // if taken, try adding to surrounding cells until found a spot
-    origin := Coord(pos)
     coord: Coord
     for {
         coord = grid.next_surrounding_cell(coord)
-        cell_idx = Cell_Idx(grid.idx(board, origin + coord))
+        cell_idx = Cell_Idx(grid.idx(board, Coord(pos) + coord))
 
         if troop_add_to_cell(s, cell_idx) {
             s.pos = cell_center(cell_idx)
@@ -620,20 +626,21 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
         // arrange only the alive troops
         alive_idx, _ := slice.binary_search(troop_comp.alive_units, troop.info.si)
-        pos := cell_center(t)
+        target_pos := cell_center(t)
         angle: f32
         if troop.info.side == .Enemy {
             angle = math.PI
         }
-        if closest, found := company_find_closest(side_opposite(troop.info.side), pos); found {
-            angle = vec2_angle(pos, company_get(closest).avg_pos) - math.PI/2
+        if closest, found := company_find_closest(side_opposite(troop.info.side), target_pos); found {
+            angle = vec2_angle(target_pos, company_get(closest).avg_pos) - math.PI/2
         }
-        target_pos := each_army_goal_pos(pos, angle, alive_idx, len(troop_comp.alive_units))
+        pos := each_army_goal_pos(target_pos, angle, alive_idx, len(troop_comp.alive_units))
 
         for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
-            coord := Coord(target_pos) + offset
-            troop.movement.target = cell_idx_safe(coord) or_continue
+            celli := cell_idx_safe(Coord(pos) + offset) or_continue
+            if cell_taken(celli, troopi) do continue
+            troop.movement.target = celli
             break
         }
     case Company_Idx:
@@ -654,10 +661,57 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
         tcomp := company_get(t)
 
+        if troop_comp.kind == .Archers {
+            // Archers are ranged
+            // - can move to closest cell that allows them to shoot
+            // - do not require free spaces around the target
+            // - can target any troop in range
+
+            RANGE :: 30
+            RANGE_MARGIN :: 6
+
+            min_dist := math.inf_f32(1)
+            min_troopi := Maybe(Troop_Idx)(0)
+            for etroopi in tcomp.units {
+                etroop := troop_get(etroopi)
+
+                dist := la.length(etroop.pos - troop.pos)
+
+                if dist < RANGE {
+                    // no need to move
+                    troop.movement.target = troop_cell_idx
+                    return
+                }
+
+                if dist < min_dist {
+                    min_dist = dist
+                    min_troopi = etroopi
+                }
+            }
+
+            etroopi := min_troopi.? or_return
+            etroop  := troop_get(etroopi)
+
+            diff := etroop.pos - troop.pos
+            diff -= la.normalize(diff) * (RANGE-RANGE_MARGIN)
+
+            pos := troop.pos + diff
+
+            for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+
+                celli := cell_idx_safe(Coord(pos) + offset) or_continue
+                if cell_taken(celli, troopi) do continue
+                troop.movement.target = celli
+                return
+            }
+        }
+
         // find closest enemy troop
-        context.user_ptr = &troop.pos
+        context.user_index = int(troopi)
         closest_idx := util.slice_min_proc(tcomp.units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
-            troop_pos := (^Vec2)(context.user_ptr)^
+
+            troopi := Troop_Idx(context.user_index)
+            pos := troop_pos(troopi)
 
             utroop := troop_get(uidx)
             ucoord := troop_get_coord(uidx)
@@ -667,16 +721,14 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             is_accessable: {
                 for dir in grid.DIRECTION_VECTORS {
                     cidx := cell_idx_safe(ucoord + dir) or_continue
-                    ctroop, has_troop := cell_troop(cidx)
-                    if !has_troop || troop_is_dead(ctroop.info.si) {
-                        break is_accessable
-                    }
+                    if cell_taken(cidx, troopi) do continue
+                    break is_accessable
                 }
 
                 return 0, false
             }
 
-            return la.distance(troop_pos, utroop.pos), true
+            return la.distance(pos, utroop.pos), true
         }) or_break
 
         closest_coord := troop_get_coord(closest_idx)
