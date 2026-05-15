@@ -244,6 +244,10 @@ troop_cell :: proc (idx: Troop_Idx) -> (cell: ^Cell) {
     cidx  := cell_idx(coord)
     return cell_get(cidx)
 }
+troop_cell_idx :: proc (idx: Troop_Idx) -> Cell_Idx {
+    coord := troop_get_coord(idx)
+    return cell_idx(coord)
+}
 troop_is_dead :: proc (idx: Troop_Idx) -> bool {
     return troop_get(idx).combat.dmg_taken >= 1
 }
@@ -273,6 +277,15 @@ company_find_closest :: proc (side: Army_Side, pos: Vec2) -> (compi: Company_Idx
         }
         return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
     })
+}
+find_first_free_cell :: proc (origin_idx: Cell_Idx, troopi: Troop_Idx) -> Cell_Idx {
+    origin := cell_coord(origin_idx)
+    for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+
+        celli := cell_idx_safe(origin + offset) or_continue
+        if cell_taken(celli, troopi) do continue
+        return celli
+    }
 }
 troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
 
@@ -615,7 +628,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
     troop := troop_get(troopi)
     troop_coord := board_coord_from_pos(troop.pos)
-    troop_cell_idx := cell_idx(troop_coord)
+    troop_celli := cell_idx(troop_coord)
 
     troop_comp := company_get(troop.info.compi)
     troop_config := unit_config[troop_comp.kind]
@@ -635,14 +648,10 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             angle = vec2_angle(target_pos, company_get(closest).avg_pos) - math.PI/2
         }
         pos := each_army_goal_pos(target_pos, angle, alive_idx, len(troop_comp.alive_units))
+        pos_celli, _ := cell_idx_from_pos(pos)
 
-        for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+        troop.movement.target = find_first_free_cell(pos_celli, troopi)
 
-            celli := cell_idx_safe(Coord(pos) + offset) or_continue
-            if cell_taken(celli, troopi) do continue
-            troop.movement.target = celli
-            break
-        }
     case Company_Idx:
         // go to closest available troop from target company
 
@@ -655,7 +664,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
             troop_attack(troop, ctroop) or_continue
             troop.movement.target = cidx
-            troop_apply_force(troop, troop_cell_idx, dt)
+            troop_apply_force(troop, troop_celli, dt)
             return true // moved
         }
 
@@ -667,7 +676,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             // - do not require free spaces around the target
             // - can target any troop in range
 
-            RANGE :: 30
+            RANGE :: 36
             RANGE_MARGIN :: 6
 
             min_dist := math.inf_f32(1)
@@ -679,7 +688,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
                 if dist < RANGE {
                     // no need to move
-                    troop.movement.target = troop_cell_idx
+                    troop.movement.target = troop_celli
                     return
                 }
 
@@ -696,14 +705,10 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             diff -= la.normalize(diff) * (RANGE-RANGE_MARGIN)
 
             pos := troop.pos + diff
+            pos_celli, _ := cell_idx_from_pos(pos)
 
-            for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
-
-                celli := cell_idx_safe(Coord(pos) + offset) or_continue
-                if cell_taken(celli, troopi) do continue
-                troop.movement.target = celli
-                return
-            }
+            troop.movement.target = find_first_free_cell(pos_celli, troopi)
+            return
         }
 
         // find closest enemy troop
@@ -731,17 +736,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             return la.distance(pos, utroop.pos), true
         }) or_break
 
-        closest_coord := troop_get_coord(closest_idx)
-
-        // set the target as one of the adjacent cells
-        for dir in grid.DIRECTION_VECTORS {
-            cidx := cell_idx_safe(closest_coord + dir) or_continue
-            ctroop, has_troop := cell_troop(cidx)
-            if !has_troop || troop_is_dead(ctroop.info.si) {
-                troop.movement.target = cidx
-                break
-            }
-        }
+        troop.movement.target = find_first_free_cell(troop_cell_idx(closest_idx), troopi)
     }
 
     return false
