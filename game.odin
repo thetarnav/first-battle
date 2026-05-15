@@ -39,11 +39,11 @@ Unit_Kind :: enum u8 {
     Infantry,
     Heavy,
     Riders,
+    Archers,
 }
 Company :: struct {
     side:        Army_Side,
     idx:         Company_Idx,
-    name:        string,
     kind:        Unit_Kind,
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
@@ -93,16 +93,18 @@ army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
 @rodata
-initial_army_units: [Army_Side][]struct {name: string, kind: Unit_Kind, pos: Coord, rot: f32, count: int} = {
+initial_army_units: [Army_Side][]struct {kind: Unit_Kind, pos: Coord, count: int} = {
     .Player = {
-        {"one", .Infantry, {23,  100}, -0.2, 200},
-        {"two", .Heavy,    {60,  90},  -0.4, 120},
-        {"thr", .Riders,   {100, 90},  -0.4, 120},
+        {.Infantry, {23,  100}, 120},
+        {.Heavy,    {60,  90},  80},
+        {.Riders,   {100, 100},  80},
+        {.Archers,  {70,  110}, 80},
     },
-    .Enemy  = {
-        {"one", .Infantry, {23,  26}, math.PI,       200},
-        {"two", .Heavy,    {60,  20}, math.PI - 0.2, 120},
-        {"thr", .Riders,   {100, 30}, math.PI - 0.4, 120},
+    .Enemy = {
+        {.Infantry, {23,  26}, 120},
+        {.Heavy,    {60,  40}, 80},
+        {.Riders,   {100, 20}, 80},
+        {.Archers,  {70,  20}, 80},
     },
 }
 
@@ -117,7 +119,8 @@ Unit_Config :: struct {
 unit_config := [Unit_Kind]Unit_Config{
     .Infantry = {color={230, 200, 190}, accel=0.000034, frict=0.992,  dmg_static=0.1,  dmg_move=16,  armor=0.7},
     .Heavy    = {color={110, 110, 100}, accel=0.000024, frict=0.99,   dmg_static=0.22, dmg_move=10,  armor=3},
-    .Riders   = {color={180, 180,  50}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
+    .Riders   = {color={150, 130,  20}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
+    .Archers  = {color={80,  250,  60}, accel=0.000034, frict=0.992,  dmg_static=0.04, dmg_move=6,   armor=0.4},
 }
 
 automatic := [Army_Side]bool{
@@ -409,7 +412,6 @@ game_init :: proc () {
             comp.side   = army.side
             comp.idx    = compi
             comp.kind   = initial.kind
-            comp.name   = initial.name
             comp.units  = make([]Troop_Idx, initial.count)
 
             comp_celli := cell_idx(initial.pos)
@@ -427,7 +429,8 @@ game_init :: proc () {
                 s.info.si    = si
                 s.info.compi = compi
 
-                pos := each_army_goal_pos(cell_center(comp_celli), initial.rot, i, initial.count)
+                rot: f32 = 0 if army.side == .Player else math.PI
+                pos := each_army_goal_pos(cell_center(comp_celli), rot, i, initial.count)
                 troop_set_pos_force(s, pos)
 
                 s.movement.path = make(type_of(s.movement.path))
@@ -582,6 +585,116 @@ update_automatic :: proc () -> (ok: bool) {
     return true
 }
 
+troop_attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
+
+    if enemy.info.side == troop.info.side do return
+    if troop_is_dead(enemy.info.si) do return
+
+    tconfig := troop_config(troop.info.si)
+    econfig := troop_config(enemy.info.si)
+
+    dmg := tconfig.dmg_static + tconfig.dmg_move * la.length(troop.movement.velocity)
+    dmg /= econfig.armor
+
+    enemy.combat.in_fight += 0.8
+    enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
+    troop.combat.in_fight += 1
+
+    return true
+}
+
+update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
+
+    troop_is_alive(troopi) or_return
+
+    troop := troop_get(troopi)
+    troop_coord := board_coord_from_pos(troop.pos)
+    troop_cell_idx := cell_idx(troop_coord)
+
+    troop_comp := company_get(troop.info.compi)
+    troop_config := unit_config[troop_comp.kind]
+
+    switch t in troop_comp.target {
+    case Cell_Idx:
+        // go to closest available cell to target cell
+
+        // arrange only the alive troops
+        alive_idx, _ := slice.binary_search(troop_comp.alive_units, troop.info.si)
+        pos := cell_center(t)
+        angle: f32
+        if troop.info.side == .Enemy {
+            angle = math.PI
+        }
+        if closest, found := company_find_closest(side_opposite(troop.info.side), pos); found {
+            angle = vec2_angle(pos, company_get(closest).avg_pos) - math.PI/2
+        }
+        target_pos := each_army_goal_pos(pos, angle, alive_idx, len(troop_comp.alive_units))
+
+        for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
+
+            coord := Coord(target_pos) + offset
+            troop.movement.target = cell_idx_safe(coord) or_continue
+            break
+        }
+    case Company_Idx:
+        // go to closest available troop from target company
+
+        // already next to an enemy
+        for dir in grid.DIRECTION_VECTORS {
+
+            cidx   := cell_idx_safe(troop_coord + dir) or_continue
+            ctroop := cell_troop(cidx) or_continue
+            if ctroop.info.compi != t do continue
+
+            troop_attack(troop, ctroop) or_continue
+            troop.movement.target = cidx
+            troop_apply_force(troop, troop_cell_idx, dt)
+            return true // moved
+        }
+
+        tcomp := company_get(t)
+
+        // find closest enemy troop
+        context.user_ptr = &troop.pos
+        closest_idx := util.slice_min_proc(tcomp.units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
+            troop_pos := (^Vec2)(context.user_ptr)^
+
+            utroop := troop_get(uidx)
+            ucoord := troop_get_coord(uidx)
+
+            troop_is_alive(uidx) or_return
+
+            is_accessable: {
+                for dir in grid.DIRECTION_VECTORS {
+                    cidx := cell_idx_safe(ucoord + dir) or_continue
+                    ctroop, has_troop := cell_troop(cidx)
+                    if !has_troop || troop_is_dead(ctroop.info.si) {
+                        break is_accessable
+                    }
+                }
+
+                return 0, false
+            }
+
+            return la.distance(troop_pos, utroop.pos), true
+        }) or_break
+
+        closest_coord := troop_get_coord(closest_idx)
+
+        // set the target as one of the adjacent cells
+        for dir in grid.DIRECTION_VECTORS {
+            cidx := cell_idx_safe(closest_coord + dir) or_continue
+            ctroop, has_troop := cell_troop(cidx)
+            if !has_troop || troop_is_dead(ctroop.info.si) {
+                troop.movement.target = cidx
+                break
+            }
+        }
+    }
+
+    return false
+}
+
 update_troops :: proc (dt: f32) -> (ok: bool) {
 
     for _, i in troops {
@@ -610,102 +723,9 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
         troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
 
-        attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
-            if enemy.info.side == troop.info.side do return
-            if troop_is_dead(enemy.info.si) do return
-
-            tconfig := troop_config(troop.info.si)
-            econfig := troop_config(enemy.info.si)
-
-            dmg := tconfig.dmg_static + tconfig.dmg_move * la.length(troop.movement.velocity)
-            dmg /= econfig.armor
-
-            enemy.combat.in_fight += 0.8
-            enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
-            troop.combat.in_fight += 1
-
-            return true
-        }
-
-        update_target: if time_to_update {
-            // update troop's target based on the current company target
-
-            switch t in troop_comp.target {
-            case Cell_Idx:
-                // go to closest available cell to target cell
- 
-                // arrange only the alive troops
-                alive_idx, _ := slice.binary_search(troop_comp.alive_units, troop.info.si)
-                pos := cell_center(t)
-                angle: f32
-                if troop.info.side == .Enemy {
-                    angle = math.PI
-                }
-                if closest, found := company_find_closest(side_opposite(troop.info.side), pos); found {
-                    angle = vec2_angle(pos, company_get(closest).avg_pos) - math.PI/2
-                }
-                target_pos := each_army_goal_pos(pos, angle, alive_idx, len(troop_comp.alive_units))
-
-                for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
-
-                    coord := Coord(target_pos) + offset
-                    troop.movement.target = cell_idx_safe(coord) or_continue
-                    break
-                }
-            case Company_Idx:
-                // go to closest available troop from target company
-
-                // already next to an enemy
-                for dir in grid.DIRECTION_VECTORS {
-
-                    cidx   := cell_idx_safe(troop_coord + dir) or_continue
-                    ctroop := cell_troop(cidx) or_continue
-                    if ctroop.info.compi != t do continue
-
-                    attack(troop, ctroop) or_continue
-                    troop.movement.target = cidx
-                    troop_apply_force(troop, troop_cell_idx, dt)
-                    continue update_troops
-                }
-
-                tcomp := company_get(t)
-
-                // find closest enemy troop
-                context.user_ptr = &troop.pos
-                closest_idx := util.slice_min_proc(tcomp.units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
-                    troop_pos := (^Vec2)(context.user_ptr)^
-
-                    utroop := troop_get(uidx)
-                    ucoord := troop_get_coord(uidx)
-
-                    troop_is_alive(uidx) or_return
-
-                    is_accessable: {
-                        for dir in grid.DIRECTION_VECTORS {
-                            cidx := cell_idx_safe(ucoord + dir) or_continue
-                            ctroop, has_troop := cell_troop(cidx)
-                            if !has_troop || troop_is_dead(ctroop.info.si) {
-                                break is_accessable
-                            }
-                        }
-
-                        return 0, false
-                    }
-
-                    return la.distance(troop_pos, utroop.pos), true
-                }) or_break
-
-                closest_coord := troop_get_coord(closest_idx)
-
-                // set the target as one of the adjacent cells
-                for dir in grid.DIRECTION_VECTORS {
-                    cidx := cell_idx_safe(closest_coord + dir) or_continue
-                    ctroop, has_troop := cell_troop(cidx)
-                    if !has_troop || troop_is_dead(ctroop.info.si) {
-                        troop.movement.target = cidx
-                        break
-                    }
-                }
+        if time_to_update {
+            if update_troop_target(si, dt) {
+                continue update_troops // moved
             }
         }
 
@@ -730,7 +750,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             // collision with enemy - apply speed-based damage
             if collision_idx, collided := collision.?; collided {
                 if occupant, occupied := cell_troop(collision_idx); occupied {
-                    attack(troop, occupant)
+                    troop_attack(troop, occupant)
                 }
             }
             if !moved {
@@ -797,7 +817,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             collision, moved := troop_apply_force(troop, next, dt)
             if collision_idx, collided := collision.?; collided {
                 if occupant, occupied := cell_troop(collision_idx); occupied {
-                    attack(troop, occupant)
+                    troop_attack(troop, occupant)
                 }
             }
             continue update_troops
@@ -807,7 +827,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             for dir in grid.DIRECTION_VECTORS {
                 cidx := cell_idx_safe(troop_coord + dir) or_continue
                 ctroop := cell_troop(cidx) or_continue
-                attack(troop, ctroop) or_continue
+                troop_attack(troop, ctroop) or_continue
                 break
             }
         }
