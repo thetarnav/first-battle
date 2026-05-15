@@ -1,4 +1,4 @@
-#+ test
+#+test
 package util
 
 import "core:testing"
