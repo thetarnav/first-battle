@@ -296,11 +296,11 @@ company_find_closest :: proc (side: Army_Side, pos: Vec2) -> (compi: Company_Idx
         return la.distance(ecomp.avg_pos, (^Vec2)(context.user_ptr)^), true
     })
 }
-find_first_free_cell :: proc (origin_idx: Cell_Idx, troopi: Troop_Idx) -> Cell_Idx {
-    origin := cell_coord(origin_idx)
+find_first_free_cell :: proc (origin: Vec2, troopi: Troop_Idx) -> Cell_Idx {
+
     for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
-        celli := cell_idx_safe(origin + offset) or_continue
+        celli := cell_idx_safe(Coord(origin) + offset) or_continue
         if cell_taken(celli, troopi) do continue
         return celli
     }
@@ -668,9 +668,8 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             angle = vec2_angle(target_pos, company_get(closest).avg_pos) - math.PI/2
         }
         pos := each_army_goal_pos(target_pos, angle, alive_idx, len(troop_comp.alive_units))
-        pos_celli, _ := cell_idx_from_pos(pos)
 
-        troop.movement.target = find_first_free_cell(pos_celli, troopi)
+        troop.movement.target = find_first_free_cell(pos, troopi)
 
     case Company_Idx:
         // go to closest available troop from target company
@@ -729,9 +728,8 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             diff -= la.normalize(diff) * (ARROW_RANGE-RANGE_MARGIN)
 
             pos := troop.pos + diff
-            pos_celli, _ := cell_idx_from_pos(pos)
 
-            troop.movement.target = find_first_free_cell(pos_celli, troopi)
+            troop.movement.target = find_first_free_cell(pos, troopi)
             return
         }
 
@@ -760,7 +758,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             return la.distance(pos, utroop.pos), true
         }) or_break
 
-        troop.movement.target = find_first_free_cell(troop_cell_idx(closest_idx), troopi)
+        troop.movement.target = find_first_free_cell(troop_pos(closest_idx), troopi)
     }
 
     return false
