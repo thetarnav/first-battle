@@ -156,9 +156,9 @@ mouse_pos:   Vec2
 mouse_world: Vec2
 
 ARROW_RANGE      :: 54
-ARROW_DAMPING    :: 0.995
+ARROW_DAMPING    :: 0.996
 ARROW_DAMAGE     :: 1
-ARROW_SPEED_INIT :: 0.34
+ARROW_SPEED_INIT :: 0.3
 ARROW_SPEED_MIN  :: 0.01
 
 GOLDEN_RATIO  :: 1.618
@@ -804,8 +804,12 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             }
             troop.shooting.time = 0
 
+            miss_by: Vec2
+            miss_by.x = rand.float32_range(-2, 2)
+            miss_by.y = rand.float32_range(-2, 2)
+
             target := troop_get(troop.shooting.target)
-            target_pos := target.pos + target.movement.velocity
+            target_pos := target.pos + target.movement.velocity + miss_by
             target_celli := cell_idx_from_pos(target_pos) or_break shooting
 
             append(&arrows, Arrow{
