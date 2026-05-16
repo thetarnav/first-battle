@@ -1,7 +1,6 @@
 package first_battle
 
 import "core:slice"
-import "base:runtime"
 import "core:fmt"
 import "core:math"
 import la "core:math/linalg"
@@ -67,6 +66,11 @@ Troop :: struct {
         in_fight:  f32,
     },
 
+    shooting: struct {
+        time:   f32,
+        target: Troop_Idx,
+    },
+
     movement: struct {
         target:      Maybe(Cell_Idx),
         path:        [dynamic]Cell_Idx,
@@ -78,6 +82,12 @@ Troop :: struct {
 Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
+
+Arrow :: struct {
+    from: Vec2,
+    end:  Cell_Idx,
+    pos:  Vec2,
+}
 
 Cell :: struct {
     troop:  Maybe(Troop_Idx),
@@ -129,8 +139,9 @@ automatic := [Army_Side]bool{
 }
 is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 
-troops: Troop_Arr
+troops:    Troop_Arr
 companies: [dynamic]Company
+arrows:    [dynamic]Arrow
 
 hovered_troop: Maybe(Troop_Idx)
 selected_company: Maybe(Company_Idx)
@@ -377,7 +388,7 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
         }
 
         // add to any cell
-        for cell, cell_idx in grid.slice(board) {
+        for _, cell_idx in grid.slice(board) {
             if troop_add_to_cell(s, Cell_Idx(cell_idx)) {
                 s.pos = cell_center(Cell_Idx(cell_idx))
                 return
@@ -631,7 +642,6 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
     troop_celli := cell_idx(troop_coord)
 
     troop_comp := company_get(troop.info.compi)
-    troop_config := unit_config[troop_comp.kind]
 
     switch t in troop_comp.target {
     case Cell_Idx:
@@ -676,11 +686,11 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             // - do not require free spaces around the target
             // - can target any troop in range
 
-            RANGE :: 36
+            RANGE :: 46
             RANGE_MARGIN :: 6
 
             min_dist := math.inf_f32(1)
-            min_troopi := Maybe(Troop_Idx)(0)
+            min_troopi: Maybe(Troop_Idx)
             for etroopi in tcomp.units {
                 etroop := troop_get(etroopi)
 
@@ -689,6 +699,11 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
                 if dist < RANGE {
                     // no need to move
                     troop.movement.target = troop_celli
+
+                    // begin shooting
+                    troop.shooting.time = rand.float32_range(2000, 4000)
+                    troop.shooting.target = etroopi
+                    troop.combat.in_fight += 1
                     return
                 }
 
@@ -744,17 +759,19 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
 update_troops :: proc (dt: f32) -> (ok: bool) {
 
+    // clear in_fight for all troops
+    // before update_troops sets it
     for _, i in troops {
         troop := &troops[i]
         troop.combat.in_fight = 0
     }
 
     update_troops:
-    for _, i in troops {
-        si := Troop_Idx(i)
-        troop := &troops[si]
+    for _, troopi_int in troops {
+        troopi := Troop_Idx(troopi_int)
+        troop  := &troops[troopi]
 
-        if troop_is_dead(si) do continue
+        if troop_is_dead(troopi) do continue
 
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
@@ -770,8 +787,32 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
         troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
 
+        // handle archers shooting before any movement
+        shooting: if troop_comp.kind == .Archers && troop.shooting.time > 0 {
+
+            troop.combat.in_fight += 1
+
+            troop.shooting.time -= dt
+            if troop.shooting.time > 0 {
+                continue update_troops
+            }
+            troop.shooting.time = 0
+
+            target := troop_get(troop.shooting.target)
+            target_pos := target.pos + target.movement.velocity
+            target_celli := cell_idx_from_pos(target_pos) or_break shooting
+
+            append(&arrows, Arrow{
+                from = troop.pos,
+                pos  = troop.pos,
+                end  = target_celli,
+            })
+
+            continue update_troops
+        }
+
         if time_to_update {
-            if update_troop_target(si, dt) {
+            if update_troop_target(troopi, dt) {
                 continue update_troops // moved
             }
         }
@@ -861,7 +902,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 }
             }
 
-            collision, moved := troop_apply_force(troop, next, dt)
+            collision, _ := troop_apply_force(troop, next, dt)
             if collision_idx, collided := collision.?; collided {
                 if occupant, occupied := cell_troop(collision_idx); occupied {
                     troop_attack(troop, occupant)
@@ -886,6 +927,20 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
     return true
 }
 
+update_arrows :: proc (dt: f32) -> (ok: bool) {
+
+    #reverse for &arrow, i in arrows {
+        target_pos := cell_center(arrow.end)
+        arrow.pos = exp_decay(arrow.pos, target_pos, 0.0001, dt)
+
+        if cell_idx_from_pos(arrow.pos) == arrow.end {
+            unordered_remove(&arrows, i)
+        }
+    }
+
+    return true
+}
+
 update :: proc (dt: f32) -> bool {
 
     update_frame_globals()
@@ -894,6 +949,7 @@ update :: proc (dt: f32) -> bool {
     update_click()
     update_automatic()
     update_troops(dt)
+    update_arrows(dt)
 
     if k2.key_went_down(.Q) {
         return false
@@ -906,7 +962,7 @@ frame :: proc (dt: f32) -> bool {
     k2.clear({12, 10, 9, 255})
 
     // draw corpses
-    for cell, i in grid.slice(board) {
+    for _, i in grid.slice(board) {
         if cell_corpse(Cell_Idx(i)) {
             p := cell_center(Cell_Idx(i))
             p = world_pos_to_screen(p)
@@ -950,6 +1006,19 @@ frame :: proc (dt: f32) -> bool {
             size *= 2
         }
         k2.draw_circle(pos, size, c)
+    }
+
+    // draw arrows
+    for arrow in arrows {
+        end := cell_center(arrow.end)
+        angle := vec2_angle(arrow.from, end)
+        line := [2]Vec2{0, {2, 0}}
+        line[1] = vec2_rotate(line[1], angle)
+        line[0] += arrow.pos
+        line[1] += arrow.pos
+        line[0] = world_pos_to_screen(line[0])
+        line[1] = world_pos_to_screen(line[1])
+        k2.draw_line(line[0], line[1], 2.6, k2.LIGHT_BROWN)
     }
 
     // draw company targets
@@ -1011,9 +1080,7 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    mouse_pos := k2.get_mouse_position()
     draw_cross(mouse_pos, k2.GREEN)
-
     draw_cross(window_size/2, k2.GRAY)
 
     // p: Coord

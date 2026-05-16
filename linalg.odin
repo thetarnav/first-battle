@@ -74,7 +74,8 @@ cbrt :: #force_inline proc "contextless" (x: f32) -> f32 {
 
 @require_results
 hypot_f32_3d :: proc "contextless" (x, y, z: f32) -> f32 {
-	x, y, z := abs(x), abs(y), abs(z)
+	x, y, z := x, y, z
+	x, y, z = abs(x), abs(y), abs(z)
 
 	if math.is_inf(x, 1) || math.is_inf(y, 1) || math.is_inf(z, 1) {
 		return math.inf_f32(1)
