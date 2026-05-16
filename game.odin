@@ -825,6 +825,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
            (time_to_update || troop.movement.prefer == .Target) {
             // try moving towards the target directly
 
+            // TODO: this is not really next cell—need to check with an intention vector
             next := troop_coord + la.sign(target_coord-troop_coord)
             next_idx  := cell_idx(next)
             next_cell := cell_get(next_idx)
@@ -929,16 +930,42 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
 update_arrows :: proc (dt: f32) -> (ok: bool) {
 
-    #reverse for &arrow, i in arrows {
-        target_pos := cell_center(arrow.end)
-        arrow.pos = exp_decay(arrow.pos, target_pos, 0.0001, dt)
+	#reverse for &arrow, i in arrows {
 
-        if cell_idx_from_pos(arrow.pos) == arrow.end {
-            unordered_remove(&arrows, i)
-        }
-    }
+		end_pos := cell_center(arrow.end)
+		arrow.pos = exp_decay(arrow.pos, end_pos, 0.0001, dt)
 
-    return true
+		do_check_hit: bool
+		do_remove_after: bool
+
+		if cell_idx_from_pos(arrow.pos) == arrow.end {
+			do_check_hit = true
+			do_remove_after = true
+		}
+
+		end_coord := cell_coord(arrow.end)
+		pos_coord, _ := board_coord_from_pos(arrow.pos)
+		coord_diff := la.abs(end_coord - pos_coord)
+		if coord_diff.x <= 1 && coord_diff.y <= 1 && Coord(arrow.from) != pos_coord {
+			do_check_hit = true
+		}
+
+		check_hit: if do_check_hit {
+			pos_celli := cell_idx(pos_coord)
+			pos_troop := cell_troop(pos_celli) or_break check_hit
+			if troop_is_dead(pos_troop.info.si) do break check_hit
+
+			pos_troop_config := troop_config(pos_troop.info.si)
+			pos_troop.combat.dmg_taken += 1 / pos_troop_config.armor
+            do_remove_after = true
+		}
+
+		if do_remove_after {
+			unordered_remove(&arrows, i)
+		}
+	}
+
+	return true
 }
 
 update :: proc (dt: f32) -> bool {
