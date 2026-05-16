@@ -328,7 +328,7 @@ troop_add_to_cell :: proc (s: Troop_Ptr, cell_idx: Cell_Idx) -> (ok: bool) {
     cell.troop = s.info.si
     return true
 }
-troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (collision: Maybe(Cell_Idx), moved: bool) {
+troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved: bool) {
 
     s_idx := cell_idx_from_pos(troop.pos)
 
@@ -352,7 +352,7 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (colli
     }
 
     if la.length(diff) < 0.01 && s_coord == e_coord {
-        return nil, true
+        return true
     }
 
     config := unit_config[company_get(troop.info.compi).kind]
@@ -372,14 +372,17 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (colli
         next_celli = cell_idx_from_pos(troop.pos)
         pos := rect_clamp_point_exclusive(cell_rect(next_celli), next_pos)
         assert(next_celli == cell_idx_from_pos(pos))
-        if troop.pos == pos {
-            return next_celli, false // cannot move further
+        if troop.pos != pos {
+            moved = true
+            troop.pos = pos
         }
-        troop.pos = pos
-        return next_celli, true
+        if occupant, occupied := cell_troop(next_celli); occupied {
+            troop_attack(troop, occupant)
+        }
+        return moved
     }
 
-    return nil, true
+    return true
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
@@ -826,6 +829,14 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             if update_troop_target(troopi, dt) {
                 continue update_troops // moved
             }
+
+            // attack
+            for dir in grid.DIRECTION_VECTORS {
+                cidx := cell_idx_safe(troop_coord + dir) or_continue
+                ctroop := cell_troop(cidx) or_continue
+                troop_attack(troop, ctroop) or_continue
+                break
+            }
         }
 
         target, has_target := troop.movement.target.(Cell_Idx)
@@ -846,14 +857,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             }
 
             troop.movement.prefer = .Target
-            collision, moved := troop_apply_force(troop, target, dt)
-            // collision with enemy - apply speed-based damage
-            if collision_idx, collided := collision.?; collided {
-                if occupant, occupied := cell_troop(collision_idx); occupied {
-                    troop_attack(troop, occupant)
-                }
-            }
-            if !moved {
+            if !troop_apply_force(troop, target, dt) {
                 troop.movement.prefer = .Path
             }
             continue update_troops
@@ -914,22 +918,8 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 }
             }
 
-            collision, _ := troop_apply_force(troop, next, dt)
-            if collision_idx, collided := collision.?; collided {
-                if occupant, occupied := cell_troop(collision_idx); occupied {
-                    troop_attack(troop, occupant)
-                }
-            }
+            troop_apply_force(troop, next, dt)
             continue update_troops
-        }
-
-        if time_to_update {
-            for dir in grid.DIRECTION_VECTORS {
-                cidx := cell_idx_safe(troop_coord + dir) or_continue
-                ctroop := cell_troop(cidx) or_continue
-                troop_attack(troop, ctroop) or_continue
-                break
-            }
         }
 
         // fallback: move to center of own cell
