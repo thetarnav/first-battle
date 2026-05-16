@@ -84,9 +84,10 @@ Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
 
 Arrow :: struct {
-    from: Vec2,
-    end:  Cell_Idx,
-    pos:  Vec2,
+    from:  Vec2,
+    end:   Cell_Idx,
+    pos:   Vec2,
+    speed: f32,
 }
 
 Cell :: struct {
@@ -153,6 +154,12 @@ window_size: Vec2
 board_rect:  Rect
 mouse_pos:   Vec2
 mouse_world: Vec2
+
+ARROW_RANGE      :: 54
+ARROW_DAMPING    :: 0.995
+ARROW_DAMAGE     :: 1
+ARROW_SPEED_INIT :: 0.34
+ARROW_SPEED_MIN  :: 0.01
 
 GOLDEN_RATIO  :: 1.618
 
@@ -686,22 +693,21 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             // - do not require free spaces around the target
             // - can target any troop in range
 
-            RANGE :: 46
             RANGE_MARGIN :: 6
 
             min_dist := math.inf_f32(1)
             min_troopi: Maybe(Troop_Idx)
-            for etroopi in tcomp.units {
+            for etroopi in tcomp.alive_units {
                 etroop := troop_get(etroopi)
 
                 dist := la.length(etroop.pos - troop.pos)
 
-                if dist < RANGE {
+                if dist < ARROW_RANGE {
                     // no need to move
                     troop.movement.target = troop_celli
 
                     // begin shooting
-                    troop.shooting.time = rand.float32_range(2000, 4000)
+                    troop.shooting.time = rand.float32_range(2600, 4200)
                     troop.shooting.target = etroopi
                     troop.combat.in_fight += 1
                     return
@@ -717,7 +723,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
             etroop  := troop_get(etroopi)
 
             diff := etroop.pos - troop.pos
-            diff -= la.normalize(diff) * (RANGE-RANGE_MARGIN)
+            diff -= la.normalize(diff) * (ARROW_RANGE-RANGE_MARGIN)
 
             pos := troop.pos + diff
             pos_celli, _ := cell_idx_from_pos(pos)
@@ -728,7 +734,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
         // find closest enemy troop
         context.user_index = int(troopi)
-        closest_idx := util.slice_min_proc(tcomp.units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
+        closest_idx := util.slice_min_proc(tcomp.alive_units, proc (uidx: Troop_Idx) -> (val: f32, ok: bool) {
 
             troopi := Troop_Idx(context.user_index)
             pos := troop_pos(troopi)
@@ -803,9 +809,10 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             target_celli := cell_idx_from_pos(target_pos) or_break shooting
 
             append(&arrows, Arrow{
-                from = troop.pos,
-                pos  = troop.pos,
-                end  = target_celli,
+                from  = troop.pos,
+                pos   = troop.pos,
+                end   = target_celli,
+                speed = ARROW_SPEED_INIT,
             })
 
             continue update_troops
@@ -933,12 +940,13 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 	#reverse for &arrow, i in arrows {
 
 		end_pos := cell_center(arrow.end)
-		arrow.pos = exp_decay(arrow.pos, end_pos, 0.0001, dt)
+        arrow.speed *= math.pow(ARROW_DAMPING, dt)
+		arrow.pos   += la.normalize(end_pos-arrow.from) * arrow.speed * dt
 
 		do_check_hit: bool
 		do_remove_after: bool
 
-		if cell_idx_from_pos(arrow.pos) == arrow.end {
+		if cell_idx_from_pos(arrow.pos) == arrow.end || arrow.speed < ARROW_SPEED_MIN {
 			do_check_hit = true
 			do_remove_after = true
 		}
