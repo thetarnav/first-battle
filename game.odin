@@ -242,7 +242,11 @@ each_army_goal_pos :: proc (origin: Vec2, rot: f32, i, n: int) -> (p: Vec2) {
         return origin
     }
     dim := army_count_dim(n)
-    xy := [2]int{i%dim.x, i/dim.x} - dim/2
+    xy := [2]int{i%dim.x, i/dim.x}
+    if xy.y % 2 == 1 {
+        xy.x = dim.x - xy.x - 1
+    }
+    xy -= dim/2
     p = Vec2(xy) * 2
     p = vec2_rotate_angle(p, rot)
     p += origin
