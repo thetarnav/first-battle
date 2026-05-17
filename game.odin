@@ -104,19 +104,11 @@ army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
 @rodata
-initial_army_units: [Army_Side][]struct {kind: Unit_Kind, pos: Coord, count: int} = {
-    .Player = {
-        {.Infantry, {23,  100}, 120},
-        {.Heavy,    {60,  90},  80},
-        {.Riders,   {100, 100},  80},
-        {.Archers,  {70,  110}, 80},
-    },
-    .Enemy = {
-        {.Infantry, {23,  26}, 120},
-        {.Heavy,    {60,  40}, 80},
-        {.Riders,   {100, 20}, 80},
-        {.Archers,  {70,  20}, 80},
-    },
+initial_army_units: []struct {kind: Unit_Kind, pos: Coord, count: int} = {
+    {.Infantry, {23,  26}, 120},
+    {.Heavy,    {60,  40}, 80},
+    {.Riders,   {100, 20}, 80},
+    {.Archers,  {70,  20}, 80},
 }
 
 Unit_Config :: struct {
@@ -164,7 +156,7 @@ ARROW_SPEED_MIN  :: 0.01
 GOLDEN_RATIO  :: 1.618
 
 BOARD_X           :: 128
-BOARD_Y           :: 128
+BOARD_Y           :: 164
 BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
@@ -440,12 +432,11 @@ game_init :: proc () {
 
     // each army
     for &army in armies {
-        initials := initial_army_units[army.side]
 
-        army.units = make([]Company_Idx, len(initials))
+        army.units = make([]Company_Idx, len(initial_army_units))
 
         // each company
-        for initial, ci in initials {
+        for initial, ci in initial_army_units {
 
             append_nothing(&companies)
             compi := Company_Idx(len(companies)-1)
@@ -458,7 +449,12 @@ game_init :: proc () {
             comp.kind   = initial.kind
             comp.units  = make([]Troop_Idx, initial.count)
 
-            comp_celli := cell_idx(initial.pos)
+            comp_coord := initial.pos
+            if army.side == .Player {
+                comp_coord.y = BOARD_Y - comp_coord.y
+            }
+
+            comp_celli := cell_idx(comp_coord)
             comp.target = comp_celli
 
             // each troop
