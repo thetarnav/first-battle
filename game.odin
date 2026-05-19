@@ -147,7 +147,7 @@ board_rect:  Rect
 mouse_pos:   Vec2
 mouse_world: Vec2
 
-tex_base: k2.Texture
+tex_atlas: k2.Texture
 
 ARROW_RANGE      :: 54
 ARROW_DAMPING    :: 0.996
@@ -165,6 +165,8 @@ BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
 
 TROOP_W :: 5
+
+BG_COLOR :: Color{195, 163, 138, 255}
 
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
@@ -272,6 +274,9 @@ troop_is_alive :: proc (idx: Troop_Idx) -> bool {
 troop_company_idx :: proc (idx: Troop_Idx) -> Company_Idx {
     troop := troop_get(idx)
     return troop.info.compi
+}
+troop_company :: proc (idx: Troop_Idx) -> ^Company {
+    return company_get(troop_company_idx(idx))
 }
 troop_config :: proc (idx: Troop_Idx) -> Unit_Config {
     return unit_config[company_get(troop_company_idx(idx)).kind]
@@ -479,7 +484,7 @@ game_init :: proc () {
         }
     }
 
-    tex_base = k2.load_texture_from_bytes(#load("base.png"))
+    tex_atlas = k2.load_texture_from_bytes(#load(ATLAS_TEXTURE))
 }
 
 update_frame_globals :: proc () {
@@ -989,7 +994,8 @@ update :: proc (dt: f32) -> bool {
 
 frame :: proc (dt: f32) -> bool {
 
-    k2.clear({12, 10, 9, 255})
+    // k2.clear({12, 10, 9, 255})
+    k2.clear(BG_COLOR)
 
     // draw corpses
     for _, i in grid.slice(board) {
@@ -1025,7 +1031,7 @@ frame :: proc (dt: f32) -> bool {
         troop_is_alive(si) or_continue
 
         // color := army_player.color
-        size := f32(TROOP_W)
+        size := f32(TROOP_W) + 2
         army_color := armies[troop.info.side].color
         kind_color := troop_config(si).color
         c := color.lerp(army_color, color.rgba(kind_color), 0.5)
@@ -1047,7 +1053,15 @@ frame :: proc (dt: f32) -> bool {
             rot = PI
         }
 
-        draw_texture(tex_base, {pos-size, size*2}, rot=rot)
+        tex_slice: Atlas_Slice
+        switch troop_company(si).kind {
+        case .Infantry: tex_slice = .Base
+        case .Archers:  tex_slice = .Archer
+        case .Heavy:    tex_slice = .Heavy
+        case .Riders:   tex_slice = .Rider
+        }
+
+        draw_texture(tex_atlas, {pos-size, size*2}, atlas_rects[tex_slice], rot=rot)
     }
 
     // draw arrows
