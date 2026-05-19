@@ -147,6 +147,8 @@ board_rect:  Rect
 mouse_pos:   Vec2
 mouse_world: Vec2
 
+tex_base: k2.Texture
+
 ARROW_RANGE      :: 54
 ARROW_DAMPING    :: 0.996
 ARROW_DAMAGE     :: 1
@@ -162,8 +164,7 @@ BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
 
-TROOP_W :: 4
-TROOP_M :: 3
+TROOP_W :: 5
 
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
@@ -477,6 +478,8 @@ game_init :: proc () {
             }
         }
     }
+
+    tex_base = k2.load_texture_from_bytes(#load("base.png"))
 }
 
 update_frame_globals :: proc () {
@@ -997,23 +1000,23 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    // draw lines
-    {
-        for xi in 0..=BOARD_X {
-            xp := f32(xi)/BOARD_X
-            x  := board_rect.size.x * xp
-            s  := board_rect.pos + {x, 0}
-            e  := board_rect.pos + {x, board_rect.size.y}
-            k2.draw_line(s, e, 1, k2.DARK_GRAY)
-        }
-        for yi in 0..=BOARD_Y {
-            yp := f32(yi)/BOARD_Y
-            y  := board_rect.size.y * yp
-            s  := board_rect.pos + {0, y}
-            e  := board_rect.pos + {board_rect.size.x, y}
-            k2.draw_line(s, e, 1, k2.DARK_GRAY)
-        }
-    }
+    // // draw lines
+    // {
+    //     for xi in 0..=BOARD_X {
+    //         xp := f32(xi)/BOARD_X
+    //         x  := board_rect.size.x * xp
+    //         s  := board_rect.pos + {x, 0}
+    //         e  := board_rect.pos + {x, board_rect.size.y}
+    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
+    //     }
+    //     for yi in 0..=BOARD_Y {
+    //         yp := f32(yi)/BOARD_Y
+    //         y  := board_rect.size.y * yp
+    //         s  := board_rect.pos + {0, y}
+    //         e  := board_rect.pos + {board_rect.size.x, y}
+    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
+    //     }
+    // }
 
     // draw troops
     for troop, i in troops {
@@ -1032,7 +1035,19 @@ frame :: proc (dt: f32) -> bool {
             c = k2.BLUE
             size *= 2
         }
-        k2.draw_circle(pos, size, c)
+        // k2.draw_circle(pos, size, c)
+
+        rot: f32
+        if la.length(troop.movement.velocity) > 0.001 {
+            rot = vec2_angle(0, troop.movement.velocity) - HALF_PI
+        } else if target, has_target := troop.movement.target.?;
+                  has_target && la.distance(troop.pos, cell_center(target)) > 0.1 {
+            rot = vec2_angle(troop.pos, cell_center(target)) - HALF_PI
+        } else if troop.info.side == .Enemy {
+            rot = PI
+        }
+
+        draw_texture(tex_base, {pos-size, size*2}, rot=rot)
     }
 
     // draw arrows

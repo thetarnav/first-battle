@@ -574,12 +574,12 @@ vec2_rotate_vec :: proc "contextless" (v, rot: vec2) -> vec2 {
 }
 vec2_rotate_angle_origin :: proc "contextless" (v: vec2, angle: f32, origin: vec2) -> vec2 {
 	translated := v - origin
-	rotated	:= vec2_rotate_angle(translated, angle)
+	rotated := vec2_rotate_angle(translated, angle)
 	return rotated + origin
 }
 vec2_rotate_vec_origin :: proc "contextless" (v, rot: vec2, origin: vec2) -> vec2 {
 	translated := v - origin
-	rotated	:= vec2_rotate_vec(translated, rot)
+	rotated := vec2_rotate_vec(translated, rot)
 	return rotated + origin
 }
 vec2_rotate :: proc {vec2_rotate_angle, vec2_rotate_vec, vec2_rotate_angle_origin, vec2_rotate_vec_origin}
