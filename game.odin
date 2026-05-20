@@ -990,7 +990,28 @@ update :: proc (dt: f32) -> bool {
 
 frame :: proc (dt: f32) -> bool {
 
-    k2.clear(PALETTE_COLOR_3)
+    k2.clear(PALETTE_COLOR_10)
+
+    // draw board
+    k2.draw_rect(k2_rect(board_rect), PALETTE_COLOR_3)
+
+    // draw lines
+    // {
+    //     for xi in 0..=BOARD_X {
+    //         xp := f32(xi)/BOARD_X
+    //         x  := board_rect.size.x * xp
+    //         s  := board_rect.pos + {x, 0}
+    //         e  := board_rect.pos + {x, board_rect.size.y}
+    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
+    //     }
+    //     for yi in 0..=BOARD_Y {
+    //         yp := f32(yi)/BOARD_Y
+    //         y  := board_rect.size.y * yp
+    //         s  := board_rect.pos + {0, y}
+    //         e  := board_rect.pos + {board_rect.size.x, y}
+    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
+    //     }
+    // }
 
     // draw corpses
     for _, celli_int in grid.slice(board) {
@@ -1032,25 +1053,6 @@ frame :: proc (dt: f32) -> bool {
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot)
     }
-
-    // // draw lines
-    // {
-    //     for xi in 0..=BOARD_X {
-    //         xp := f32(xi)/BOARD_X
-    //         x  := board_rect.size.x * xp
-    //         s  := board_rect.pos + {x, 0}
-    //         e  := board_rect.pos + {x, board_rect.size.y}
-    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
-    //     }
-    //     for yi in 0..=BOARD_Y {
-    //         yp := f32(yi)/BOARD_Y
-    //         y  := board_rect.size.y * yp
-    //         s  := board_rect.pos + {0, y}
-    //         e  := board_rect.pos + {board_rect.size.x, y}
-    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
-    //     }
-    // }
-
 
     // draw troop shoadows
     for troop, i in troops {
