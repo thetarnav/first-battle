@@ -982,61 +982,32 @@ update :: proc (dt: f32) -> bool {
     return true
 }
 
-frame :: proc (dt: f32) -> bool {
-
-    k2.clear(PALETTE_COLOR_4)
-
-    k2.set_camera(camera)
-
-    // draw board
+draw_board :: proc () {
     k2.draw_rect(k2_rect({0, BOARD_SIZE}), PALETTE_COLOR_3)
+}
 
-    // draw lines
-    // {
-    //     for xi in 0..=BOARD_X {
-    //         xp := f32(xi)/BOARD_X
-    //         x  := board_rect.size.x * xp
-    //         s  := board_rect.pos + {x, 0}
-    //         e  := board_rect.pos + {x, board_rect.size.y}
-    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
-    //     }
-    //     for yi in 0..=BOARD_Y {
-    //         yp := f32(yi)/BOARD_Y
-    //         y  := board_rect.size.y * yp
-    //         s  := board_rect.pos + {0, y}
-    //         e  := board_rect.pos + {board_rect.size.x, y}
-    //         k2.draw_line(s, e, 1, k2.DARK_GRAY)
-    //     }
-    // }
-
-    // draw troop shoadows
+draw_troop_shadows :: proc () {
     for troop, i in troops {
         si := Troop_Idx(i)
-
         troop_is_alive(si) or_continue
-
         k2.draw_circle(troop.pos, 3, PALETTE_COLOR_4, segments=8)
     }
+}
 
-    // draw corpses
+draw_corpses :: proc () {
     for _, celli_int in grid.slice(board) {
         celli := Cell_Idx(celli_int)
-
         cell_corpse(celli) or_continue
 
         coord := cell_coord(celli)
         pos   := cell_center(celli)
 
         cell_hash :: proc(p: Coord) -> u32 {
-
             h := u32(p.x) * 73856093
             h ~= u32(p.y) * 19349663
-
-            // final avalanche
             h ~= h >> 13
             h *= 1274126177
             h ~= h >> 16
-
             return h
         }
         h := cell_hash(coord)
@@ -1057,11 +1028,11 @@ frame :: proc (dt: f32) -> bool {
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot)
     }
+}
 
-    // draw troops
+draw_troops :: proc () {
     for troop, i in troops {
         si := Troop_Idx(i)
-
         troop_is_alive(si) or_continue
 
         pos := troop.pos
@@ -1076,7 +1047,6 @@ frame :: proc (dt: f32) -> bool {
             rot = PI
         }
 
-        // color := army_player.color
         max_side := f32(2.2)
         tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         if hovered_troop == si {
@@ -1098,8 +1068,9 @@ frame :: proc (dt: f32) -> bool {
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot, tint=tint)
     }
+}
 
-    // draw arrows
+draw_arrows :: proc () {
     for arrow in arrows {
         end := cell_center(arrow.end)
         angle := vec2_angle(arrow.from, end)
@@ -1109,8 +1080,9 @@ frame :: proc (dt: f32) -> bool {
         line[1] += arrow.pos
         k2.draw_line(line[0], line[1], 0.2, k2.LIGHT_BROWN)
     }
+}
 
-    // draw company targets
+draw_company_targets :: proc () {
     for army in armies {
         for compi in army.units {
             comp := company_get(compi)
@@ -1135,8 +1107,9 @@ frame :: proc (dt: f32) -> bool {
             }
         }
     }
+}
 
-    // selected company outline
+draw_selected_company :: proc () {
     if compi, is_selected := selected_company.?; is_selected {
         comp := company_get(compi)
 
@@ -1163,28 +1136,30 @@ frame :: proc (dt: f32) -> bool {
             k2.draw_line(a, b, 0.6, k2.GRAY)
         }
     }
+}
+
+draw_ui :: proc () {
+    draw_cross(mouse_pos, k2.GREEN)
+    draw_cross(window_size/2, k2.GRAY)
+}
+
+frame :: proc (dt: f32) -> bool {
+
+    k2.clear(PALETTE_COLOR_4)
+
+    k2.set_camera(camera)
+
+    draw_board()
+    draw_troop_shadows()
+    draw_corpses()
+    draw_troops()
+    draw_arrows()
+    draw_company_targets()
+    draw_selected_company()
 
     k2.set_camera(nil)
 
-    draw_cross(mouse_pos, k2.GREEN)
-    draw_cross(window_size/2, k2.GRAY)
-
-    // p: Coord
-    // N :: 1000
-    // for i in 0..<N {
-    //     p = grid.next_surrounding_cell(p)
-    //     c1 := color.FRGB{1, 1, 0}
-    //     c2 := color.FRGB{1, 0, 0}
-    //     c3 := color.FRGB{1, 0, 1}
-    //     c: color.FRGB
-    //     cp := f32(i)*2/N
-    //     if cp < 1 {
-    //         c = color.lerp(c1, c2, cp)
-    //     } else {
-    //         c = color.lerp(c2, c3, cp-1)
-    //     }
-    //     k2.draw_circle(board_rect.pos + Vec2(p + {40, 40}) * (board_rect.size/BOARD_SIZE), 3, k2.Color(color.urgba(c)))
-    // }
+    draw_ui()
 
     return true
 }
