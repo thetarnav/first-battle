@@ -1049,9 +1049,9 @@ draw_troops :: proc () {
 
         max_side := f32(2.2)
         tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
-        if hovered_troop == si {
+        if htroopi, has_hovered := hovered_troop.?;
+           has_hovered && troop_company_idx(htroopi) == troop_company_idx(si) {
             tint = k2.BLUE
-            max_side *= 2
         }
 
         tex_slice: Atlas_Slice
