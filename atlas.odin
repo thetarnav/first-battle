@@ -29,3 +29,16 @@ atlas_rects: [Atlas_Slice]Rect = {
     .Rider_Player = {{62, 0}, {7, 10}},
     .Heavy_Player = {{69, 0}, {7, 7}},
 }
+
+PALETTE_COLOR_0 :: Color{0, 0, 0, 0}
+PALETTE_COLOR_1 :: Color{15, 42, 63, 255}
+PALETTE_COLOR_2 :: Color{32, 57, 79, 255}
+PALETTE_COLOR_3 :: Color{246, 214, 189, 255}
+PALETTE_COLOR_4 :: Color{195, 163, 138, 255}
+PALETTE_COLOR_5 :: Color{153, 117, 119, 255}
+PALETTE_COLOR_6 :: Color{129, 98, 113, 255}
+PALETTE_COLOR_7 :: Color{78, 73, 95, 255}
+PALETTE_COLOR_8 :: Color{181, 99, 70, 255}
+PALETTE_COLOR_9 :: Color{86, 45, 36, 255}
+PALETTE_COLOR_10 :: Color{128, 95, 88, 255}
+

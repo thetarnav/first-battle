@@ -166,8 +166,6 @@ BOARD_RECT_MARGIN :: 10
 
 TROOP_W :: 5
 
-BG_COLOR :: Color{195, 163, 138, 255}
-
 screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
     return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
 }
@@ -992,8 +990,7 @@ update :: proc (dt: f32) -> bool {
 
 frame :: proc (dt: f32) -> bool {
 
-    // k2.clear({12, 10, 9, 255})
-    k2.clear(BG_COLOR)
+    k2.clear(PALETTE_COLOR_3)
 
     // draw corpses
     for _, celli_int in grid.slice(board) {
@@ -1054,24 +1051,24 @@ frame :: proc (dt: f32) -> bool {
     //     }
     // }
 
+
+    // draw troop shoadows
+    for troop, i in troops {
+        si := Troop_Idx(i)
+
+        troop_is_alive(si) or_continue
+
+        pos := world_pos_to_screen(troop.pos)
+        k2.draw_circle(pos, 6, PALETTE_COLOR_4, segments=8)
+    }
+
     // draw troops
     for troop, i in troops {
         si := Troop_Idx(i)
 
         troop_is_alive(si) or_continue
 
-        // color := army_player.color
-        max_side := f32(TROOP_W) + 2
-        army_color := armies[troop.info.side].color
-        kind_color := troop_config(si).color
-        c := color.lerp(army_color, color.rgba(kind_color), 0.5)
-        c  = color.lerp(c, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         pos := world_pos_to_screen(troop.pos)
-        if hovered_troop == si {
-            c = k2.BLUE
-            max_side *= 2
-        }
-        // k2.draw_circle(pos, size, c)
 
         rot: f32
         if la.length(troop.movement.velocity) > 0.001 {
@@ -1081,6 +1078,14 @@ frame :: proc (dt: f32) -> bool {
             rot = vec2_angle(troop.pos, cell_center(target)) - HALF_PI
         } else if troop.info.side == .Enemy {
             rot = PI
+        }
+
+        // color := army_player.color
+        max_side := f32(TROOP_W) + 2
+        tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
+        if hovered_troop == si {
+            tint = k2.BLUE
+            max_side *= 2
         }
 
         tex_slice: Atlas_Slice
@@ -1095,7 +1100,7 @@ frame :: proc (dt: f32) -> bool {
         size := fit_aspect_into_min(tex_rect.size, max_side*2)
         rect := Rect{pos-size/2, size}
 
-        draw_texture(tex_atlas, rect, tex_rect, rot=rot)
+        draw_texture(tex_atlas, rect, tex_rect, rot=rot, tint=tint)
     }
 
     // draw arrows
