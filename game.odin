@@ -144,6 +144,7 @@ board: grid.Grid(Cell)
 // updated every fame
 window_size: Vec2
 board_rect:  Rect
+camera:      k2.Camera
 mouse_pos:   Vec2
 mouse_world: Vec2
 
@@ -163,17 +164,6 @@ BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
-
-TROOP_W :: 5
-
-screen_pos_to_world :: proc (pos: Vec2) -> Vec2 {
-    return (pos - board_rect.pos)/board_rect.size * BOARD_SIZE
-}
-world_pos_from_screen :: screen_pos_to_world
-world_pos_to_screen :: proc (pos: Vec2) -> Vec2 {
-    return board_rect.pos + pos * (board_rect.size/BOARD_SIZE)
-}
-screen_pos_from_world :: world_pos_to_screen
 
 get_board_rect :: proc () -> (rect: Rect) {
     max := window_size - BOARD_RECT_MARGIN*2
@@ -486,8 +476,12 @@ game_init :: proc () {
 update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
     board_rect  = get_board_rect()
+    camera      = k2.Camera{
+        offset = board_rect.pos,
+        zoom   = board_rect.size.x / BOARD_SIZE.x, // same as y because board rect preserves aspect
+    }
     mouse_pos   = k2.get_mouse_position()
-    mouse_world = world_pos_from_screen(mouse_pos)
+    mouse_world = k2.screen_to_world(mouse_pos, camera)
 }
 
 update_hover :: proc () -> (ok: bool) {
@@ -990,10 +984,12 @@ update :: proc (dt: f32) -> bool {
 
 frame :: proc (dt: f32) -> bool {
 
-    k2.clear(PALETTE_COLOR_10)
+    k2.clear(PALETTE_COLOR_4)
+
+    k2.set_camera(camera)
 
     // draw board
-    k2.draw_rect(k2_rect(board_rect), PALETTE_COLOR_3)
+    k2.draw_rect(k2_rect({0, BOARD_SIZE}), PALETTE_COLOR_3)
 
     // draw lines
     // {
@@ -1013,6 +1009,15 @@ frame :: proc (dt: f32) -> bool {
     //     }
     // }
 
+    // draw troop shoadows
+    for troop, i in troops {
+        si := Troop_Idx(i)
+
+        troop_is_alive(si) or_continue
+
+        k2.draw_circle(troop.pos, 3, PALETTE_COLOR_4, segments=8)
+    }
+
     // draw corpses
     for _, celli_int in grid.slice(board) {
         celli := Cell_Idx(celli_int)
@@ -1020,8 +1025,7 @@ frame :: proc (dt: f32) -> bool {
         cell_corpse(celli) or_continue
 
         coord := cell_coord(celli)
-        pos := cell_center(celli)
-        pos = world_pos_to_screen(pos)
+        pos   := cell_center(celli)
 
         cell_hash :: proc(p: Coord) -> u32 {
 
@@ -1048,20 +1052,10 @@ frame :: proc (dt: f32) -> bool {
         rot := f32((h / MAX_SLICE) % 4) * (PI * 0.5)
 
         tex_rect := atlas_rects[atlas_slice]
-        size := fit_aspect_into_min(tex_rect.size, f32(TROOP_W)*2)
+        size := fit_aspect_into_min(tex_rect.size, 2)
         rect := Rect{pos-size/2, size}
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot)
-    }
-
-    // draw troop shoadows
-    for troop, i in troops {
-        si := Troop_Idx(i)
-
-        troop_is_alive(si) or_continue
-
-        pos := world_pos_to_screen(troop.pos)
-        k2.draw_circle(pos, 6, PALETTE_COLOR_4, segments=8)
     }
 
     // draw troops
@@ -1070,20 +1064,20 @@ frame :: proc (dt: f32) -> bool {
 
         troop_is_alive(si) or_continue
 
-        pos := world_pos_to_screen(troop.pos)
+        pos := troop.pos
 
         rot: f32
         if la.length(troop.movement.velocity) > 0.001 {
             rot = vec2_angle(0, troop.movement.velocity) - HALF_PI
         } else if target, has_target := troop.movement.target.?;
-                  has_target && la.distance(troop.pos, cell_center(target)) > 0.1 {
-            rot = vec2_angle(troop.pos, cell_center(target)) - HALF_PI
+                  has_target && la.distance(pos, cell_center(target)) > 0.1 {
+            rot = vec2_angle(pos, cell_center(target)) - HALF_PI
         } else if troop.info.side == .Enemy {
             rot = PI
         }
 
         // color := army_player.color
-        max_side := f32(TROOP_W) + 2
+        max_side := f32(2.2)
         tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         if hovered_troop == si {
             tint = k2.BLUE
@@ -1099,7 +1093,7 @@ frame :: proc (dt: f32) -> bool {
         }
 
         tex_rect := atlas_rects[tex_slice]
-        size := fit_aspect_into_min(tex_rect.size, max_side*2)
+        size := fit_aspect_into_min(tex_rect.size, max_side)
         rect := Rect{pos-size/2, size}
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot, tint=tint)
@@ -1113,9 +1107,7 @@ frame :: proc (dt: f32) -> bool {
         line[1] = vec2_rotate(line[1], angle)
         line[0] += arrow.pos
         line[1] += arrow.pos
-        line[0] = world_pos_to_screen(line[0])
-        line[1] = world_pos_to_screen(line[1])
-        k2.draw_line(line[0], line[1], 2.6, k2.LIGHT_BROWN)
+        k2.draw_line(line[0], line[1], 0.2, k2.LIGHT_BROWN)
     }
 
     // draw company targets
@@ -1136,13 +1128,10 @@ frame :: proc (dt: f32) -> bool {
                 end = tcomp.avg_pos
             }
 
-            start = world_pos_to_screen(start)
-            end   = world_pos_to_screen(end)
-
             if start == end {
                 draw_cross(start, k2.YELLOW)
             } else {
-                k2.draw_line(start, end, 2, k2.YELLOW)
+                k2.draw_line(start, end, 0.5, k2.YELLOW)
             }
         }
     }
@@ -1171,11 +1160,11 @@ frame :: proc (dt: f32) -> bool {
         outline = expand_convex_polygon(outline, 2, allocator=context.allocator)
         for i in 0..<len(outline) {
             a, b := outline[i], outline[(i+1)%len(outline)]
-            a = world_pos_to_screen(a)
-            b = world_pos_to_screen(b)
-            k2.draw_line(a, b, 3, k2.GRAY)
+            k2.draw_line(a, b, 0.6, k2.GRAY)
         }
     }
+
+    k2.set_camera(nil)
 
     draw_cross(mouse_pos, k2.GREEN)
     draw_cross(window_size/2, k2.GRAY)
