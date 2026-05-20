@@ -996,12 +996,44 @@ frame :: proc (dt: f32) -> bool {
     k2.clear(BG_COLOR)
 
     // draw corpses
-    for _, i in grid.slice(board) {
-        if cell_corpse(Cell_Idx(i)) {
-            p := cell_center(Cell_Idx(i))
-            p = world_pos_to_screen(p)
-            k2.draw_circle(p, f32(TROOP_W), k2.DARK_GRAY)
+    for _, celli_int in grid.slice(board) {
+        celli := Cell_Idx(celli_int)
+
+        cell_corpse(celli) or_continue
+
+        coord := cell_coord(celli)
+        pos := cell_center(celli)
+        pos = world_pos_to_screen(pos)
+
+        cell_hash :: proc(p: Coord) -> u32 {
+
+            h := u32(p.x) * 73856093
+            h ~= u32(p.y) * 19349663
+
+            // final avalanche
+            h ~= h >> 13
+            h *= 1274126177
+            h ~= h >> 16
+
+            return h
         }
+        h := cell_hash(coord)
+
+        atlas_slice: Atlas_Slice
+        MAX_SLICE :: 3
+        switch h % MAX_SLICE {
+        case 0: atlas_slice = .Corpse_1
+        case 1: atlas_slice = .Corpse_2
+        case 2: atlas_slice = .Corpse_3
+        }
+
+        rot := f32((h / MAX_SLICE) % 4) * (PI * 0.5)
+
+        tex_rect := atlas_rects[atlas_slice]
+        size := fit_aspect_into_min(tex_rect.size, f32(TROOP_W)*2)
+        rect := Rect{pos-size/2, size}
+
+        draw_texture(tex_atlas, rect, tex_rect, rot=rot)
     }
 
     // // draw lines
