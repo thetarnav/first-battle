@@ -1055,10 +1055,10 @@ frame :: proc (dt: f32) -> bool {
 
         tex_slice: Atlas_Slice
         switch troop_company(si).kind {
-        case .Infantry: tex_slice = .Base
-        case .Archers:  tex_slice = .Archer
-        case .Heavy:    tex_slice = .Heavy
-        case .Riders:   tex_slice = .Rider
+        case .Infantry: tex_slice = .Infantry_Player if troop.info.side == .Player else .Infantry_Enemy
+        case .Archers:  tex_slice = .Archer_Player   if troop.info.side == .Player else .Archer_Enemy
+        case .Heavy:    tex_slice = .Heavy_Player    if troop.info.side == .Player else .Heavy_Enemy
+        case .Riders:   tex_slice = .Rider_Player    if troop.info.side == .Player else .Rider_Enemy
         }
 
         draw_texture(tex_atlas, {pos-size, size*2}, atlas_rects[tex_slice], rot=rot)
