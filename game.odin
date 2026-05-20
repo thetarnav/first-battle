@@ -179,9 +179,7 @@ screen_pos_from_world :: world_pos_to_screen
 
 get_board_rect :: proc () -> (rect: Rect) {
     max := window_size - BOARD_RECT_MARGIN*2
-    rect.size = max
-    rect.size.x = min(rect.size.x, rect.size.y * BOARD_AR)
-    rect.size.y = min(rect.size.y, rect.size.x / BOARD_AR)
+    rect.size = fit_aspect_into(BOARD_SIZE, max)
     rect.pos = BOARD_RECT_MARGIN + (max - rect.size)/2
     return
 }
@@ -1031,7 +1029,7 @@ frame :: proc (dt: f32) -> bool {
         troop_is_alive(si) or_continue
 
         // color := army_player.color
-        size := f32(TROOP_W) + 2
+        max_side := f32(TROOP_W) + 2
         army_color := armies[troop.info.side].color
         kind_color := troop_config(si).color
         c := color.lerp(army_color, color.rgba(kind_color), 0.5)
@@ -1039,7 +1037,7 @@ frame :: proc (dt: f32) -> bool {
         pos := world_pos_to_screen(troop.pos)
         if hovered_troop == si {
             c = k2.BLUE
-            size *= 2
+            max_side *= 2
         }
         // k2.draw_circle(pos, size, c)
 
@@ -1061,7 +1059,11 @@ frame :: proc (dt: f32) -> bool {
         case .Riders:   tex_slice = .Rider_Player    if troop.info.side == .Player else .Rider_Enemy
         }
 
-        draw_texture(tex_atlas, {pos-size, size*2}, atlas_rects[tex_slice], rot=rot)
+        tex_rect := atlas_rects[tex_slice]
+        size := fit_aspect_into_min(tex_rect.size, max_side*2)
+        rect := Rect{pos-size/2, size}
+
+        draw_texture(tex_atlas, rect, tex_rect, rot=rot)
     }
 
     // draw arrows

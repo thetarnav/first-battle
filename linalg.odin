@@ -157,6 +157,18 @@ vec2_to_vec3 :: #force_inline proc "contextless" (v: $T/[2]f32, z: f32 = 0) -> v
 	return {v.x, v.y, z}
 }
 
+// get largest size that satisfies maximum dimensions with preserved aspect ratio
+vec2_fit_aspect_max :: proc(aspect, max: vec2) -> vec2 {
+	return aspect * la.min_single(max / aspect)
+}
+// get smallest size that satisfies minimum dimensions with preserved aspect ratio
+vec2_fit_aspect_min :: proc(aspect, min: vec2) -> vec2 {
+	return aspect * la.max_single(min / aspect)
+}
+fit_aspect_into :: vec2_fit_aspect_max
+fit_aspect_into_max :: vec2_fit_aspect_max
+fit_aspect_into_min :: vec2_fit_aspect_min
+
 @(require_results)
 mat3_translate :: proc "contextless" (v: vec2) -> mat3 {
 	return {
