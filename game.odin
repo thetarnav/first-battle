@@ -28,10 +28,11 @@ side_opposite :: proc (side: Army_Side) -> Army_Side {
 }
 
 Army :: struct {
-    side:     Army_Side,
-    name:     string,
-    color:    Color,
-    units:    []Company_Idx,
+    side:        Army_Side,
+    name:        string,
+    color_light: Color,
+    color_dark:  Color,
+    units:       []Company_Idx,
 }
 
 Unit_Kind :: enum u8 {
@@ -97,8 +98,8 @@ Cell :: struct {
 Cell_Idx :: distinct u16
 
 armies: [Army_Side]Army = {
-    .Player = {side=.Player, name="Player", color=k2.BLUE},
-    .Enemy  = {side=.Enemy,  name="Enemy",  color=k2.RED},
+    .Player = {side=.Player, name="Player", color_light=PALETTE_COLOR_6, color_dark=PALETTE_COLOR_2},
+    .Enemy  = {side=.Enemy,  name="Enemy",  color_light=PALETTE_COLOR_8, color_dark=PALETTE_COLOR_9},
 }
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
@@ -1112,6 +1113,7 @@ draw_company_targets :: proc () {
 draw_selected_company :: proc () {
     if compi, is_selected := selected_company.?; is_selected {
         comp := company_get(compi)
+        army := armies[comp.side]
 
         points := make([dynamic]Vec2, 0, len(comp.units), allocator=context.temp_allocator)
         for si in comp.alive_units {
@@ -1133,7 +1135,7 @@ draw_selected_company :: proc () {
         outline = expand_convex_polygon(outline, 2, allocator=context.allocator)
         for i in 0..<len(outline) {
             a, b := outline[i], outline[(i+1)%len(outline)]
-            k2.draw_line(a, b, 0.6, k2.GRAY)
+            k2.draw_line(a, b, 0.6, army.color_dark)
         }
     }
 }
