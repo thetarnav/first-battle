@@ -1,3 +1,4 @@
+#+vet !shadowing
 package first_battle
 
 import "core:slice"
@@ -487,8 +488,6 @@ rect_union :: proc "contextless" (a, b: Rect) -> Rect {
 }
 @require_results
 rect_clamp :: proc "contextless" (v, m: Rect) -> Rect {
-    s := la.max(v.pos, m.pos)
-    e := la.min(v.pos+v.size, m.pos+m.size)
     return rect(la.max(v.pos, m.pos), la.min(v.pos+v.size, m.pos+m.size))
 }
 // [rect.pos, point, rect.pos + rect.size]
@@ -516,8 +515,6 @@ rect_int :: #force_inline proc "contextless" (s, e: [2]int) -> Rect_Int {
 }
 @require_results
 rect_int_clamp :: proc "contextless" (v, m: Rect_Int) -> Rect_Int {
-    s := la.max(v.pos, m.pos)
-    e := la.min(v.pos+v.size, m.pos+m.size)
     return rect_int(la.max(v.pos, m.pos), la.min(v.pos+v.size, m.pos+m.size))
 }
 @require_results
