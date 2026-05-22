@@ -335,6 +335,10 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved
     // slow down damaged troops
     diff *= Vec2((1-troop.combat.dmg_taken)*0.6 + 0.4)
 
+    if troop.shooting.time > 0 {
+        diff /= 2
+    }
+
     // slower on corpses
     if cell_corpse(s_idx) {
         diff *= 0.75
@@ -819,6 +823,8 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 speed = ARROW_SPEED_INIT,
             })
 
+            troop_apply_force(troop, troop_cell_idx, dt)
+
             continue update_troops
         }
 
@@ -1039,11 +1045,13 @@ draw_troops :: proc () {
         pos := troop.pos
 
         rot: f32
-        if la.length(troop.movement.velocity) > 0.001 {
+        if la.length(troop.movement.velocity) > 0.01 {
             rot = vec2_angle(0, troop.movement.velocity) - HALF_PI
         } else if target, has_target := troop.movement.target.?;
                   has_target && la.distance(pos, cell_center(target)) > 0.1 {
             rot = vec2_angle(pos, cell_center(target)) - HALF_PI
+        } else if troop.shooting.time > 0 {
+            rot = vec2_angle(pos, troop_pos(troop.shooting.target)) - HALF_PI
         } else if troop.info.side == .Enemy {
             rot = PI
         }
