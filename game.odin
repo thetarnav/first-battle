@@ -1,5 +1,6 @@
 package first_battle
 
+import "base:runtime"
 import "core:slice"
 import "core:fmt"
 import "core:math"
@@ -28,10 +29,8 @@ side_opposite :: proc (side: Army_Side) -> Army_Side {
 }
 
 Army :: struct {
-    side:        Army_Side,
-    color_light: Color,
-    color_dark:  Color,
-    units:       []Company_Idx,
+    side:  Army_Side,
+    units: []Company_Idx,
 }
 
 Unit_Kind :: enum u8 {
@@ -96,13 +95,6 @@ Cell :: struct {
 }
 Cell_Idx :: distinct u16
 
-armies: [Army_Side]Army = {
-    .Player = {side=.Player, color_light=PALETTE_COLOR_6, color_dark=PALETTE_COLOR_2},
-    .Enemy  = {side=.Enemy,  color_light=PALETTE_COLOR_8, color_dark=PALETTE_COLOR_9},
-}
-army_player := &armies[.Player]
-army_enemy  := &armies[.Enemy]
-
 @rodata
 initial_army_units: []struct {kind: Unit_Kind, pos: Coord, count: int} = {
     {.Infantry, {23,  26}, 120},
@@ -126,6 +118,20 @@ unit_config := [Unit_Kind]Unit_Config{
     .Riders   = {color={150, 130,  20}, accel=0.000038, frict=0.9966, dmg_static=0.12, dmg_move=100, armor=1},
     .Archers  = {color={80,  250,  60}, accel=0.000034, frict=0.992,  dmg_static=0.04, dmg_move=6,   armor=0.4},
 }
+
+Army_Colors :: struct {
+    light, dark: Color,
+}
+army_colors := [Army_Side]Army_Colors{
+    .Player = {light=PALETTE_COLOR_6, dark=PALETTE_COLOR_2},
+    .Enemy  = {light=PALETTE_COLOR_8, dark=PALETTE_COLOR_9},
+}
+
+state_arena: runtime.Arena
+
+armies: [Army_Side]Army = {}
+army_player := &armies[.Player]
+army_enemy  := &armies[.Enemy]
 
 automatic := [Army_Side]bool{
     .Player = false,
@@ -421,15 +427,30 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
 
 game_init :: proc () {
 
+    // clear previous state
+    armies    = {}
+    companies = {}
+
+    // setup state arena
+    if state_arena == {} {
+        arena_init_err := runtime.arena_init(&state_arena, 0, context.allocator)
+        assert(arena_init_err == nil, "Couldn't init state arena allocator")
+    } else {
+        runtime.arena_free_all(&state_arena)
+    }
+
+    context.allocator = runtime.arena_allocator(&state_arena)
+
     update_frame_globals()
 
     board = grid.make(Cell, {BOARD_X, BOARD_Y})
 
-    troops = make(type_of(troops), 0, 10000, allocator=context.allocator)
+    troops = make(Troop_Arr, 0, 10000)
 
     // each army
-    for &army in armies {
+    for &army, side in armies {
 
+        army.side  = side
         army.units = make([]Company_Idx, len(initial_army_units))
 
         // each company
@@ -470,7 +491,7 @@ game_init :: proc () {
                 pos := each_army_goal_pos(cell_center(comp_celli), rot, i, initial.count)
                 troop_set_pos_force(s, pos)
 
-                s.movement.path = make(type_of(s.movement.path))
+                s.movement.path = make([dynamic]Cell_Idx)
             }
         }
     }
@@ -986,6 +1007,9 @@ update :: proc (dt: f32) -> bool {
     if k2.key_went_down(.Q) {
         return false
     }
+    if k2.key_went_down(.R) {
+        game_init()
+    }
     return true
 }
 
@@ -1143,7 +1167,7 @@ draw_selected_company :: proc () {
         outline = expand_convex_polygon(outline, 2, allocator=context.allocator)
         for i in 0..<len(outline) {
             a, b := outline[i], outline[(i+1)%len(outline)]
-            k2.draw_line(a, b, 0.6, army.color_dark)
+            k2.draw_line(a, b, 0.6, army_colors[army.side].dark)
         }
     }
 }
