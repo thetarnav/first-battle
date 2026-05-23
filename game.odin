@@ -29,7 +29,6 @@ side_opposite :: proc (side: Army_Side) -> Army_Side {
 
 Army :: struct {
     side:        Army_Side,
-    name:        string,
     color_light: Color,
     color_dark:  Color,
     units:       []Company_Idx,
@@ -98,8 +97,8 @@ Cell :: struct {
 Cell_Idx :: distinct u16
 
 armies: [Army_Side]Army = {
-    .Player = {side=.Player, name="Player", color_light=PALETTE_COLOR_6, color_dark=PALETTE_COLOR_2},
-    .Enemy  = {side=.Enemy,  name="Enemy",  color_light=PALETTE_COLOR_8, color_dark=PALETTE_COLOR_9},
+    .Player = {side=.Player, color_light=PALETTE_COLOR_6, color_dark=PALETTE_COLOR_2},
+    .Enemy  = {side=.Enemy,  color_light=PALETTE_COLOR_8, color_dark=PALETTE_COLOR_9},
 }
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
@@ -120,6 +119,7 @@ Unit_Config :: struct {
     dmg_static: f32,
     armor:      f32,
 }
+@rodata
 unit_config := [Unit_Kind]Unit_Config{
     .Infantry = {color={230, 200, 190}, accel=0.000034, frict=0.992,  dmg_static=0.1,  dmg_move=16,  armor=0.7},
     .Heavy    = {color={110, 110, 100}, accel=0.000024, frict=0.99,   dmg_static=0.22, dmg_move=10,  armor=3},
