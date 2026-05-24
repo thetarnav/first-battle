@@ -34,34 +34,25 @@ time_now :: proc () -> f32 {
 
 step :: proc () -> bool {
 
-    k2.update() or_return
+    @static time_last: f32
+    @static time_miss: f32
 
-    @static time_last_update: f32
+    time_now   := time_now()
+    dt         := time_now - time_last
+    elapsed    := dt + time_miss
+    capped_dt  := min(dt, MAX_DT*2)
 
-    time_now_update  := time_now()
-    dt_update        := time_now_update - time_last_update
-    capped_dt_update := min(dt_update, MAX_DT*2)
-
-    time_last_update = time_now_update
-    update(capped_dt_update) or_return
-
-    @static time_last_frame: f32
-    @static time_miss_frame: f32
-
-    time_now_frame   := time_now()
-    dt_frame         := time_now_frame - time_last_frame
-    elapsed_frame    := dt_frame  + time_miss_frame
-    capped_dt_frame  := min(dt_frame, MAX_DT*2)
-
-    if elapsed_frame < MAX_DT {
+    if elapsed < MAX_DT {
         return true
     }
 
-    time_last_frame = time_now_frame
-    time_miss_frame = max(0, elapsed_frame - MAX_DT) // Carry over extra time
-    frame(capped_dt_frame) or_return
+    time_last = time_now
+    time_miss = max(0, elapsed - MAX_DT) // Carry over extra time
 
-    fps := 1000.0/dt_frame
+    k2.update() or_return
+    frame(capped_dt) or_return
+
+    fps := 1000.0/dt
     k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
 
     k2.present()

@@ -170,6 +170,13 @@ fit_aspect_into :: vec2_fit_aspect_max
 fit_aspect_into_max :: vec2_fit_aspect_max
 fit_aspect_into_min :: vec2_fit_aspect_min
 
+rect_fit_aspect_max :: proc (aspect, max: Vec2, margin: Vec2 = 0) -> (rect: Rect) {
+    max := max - margin*2
+    rect.size = fit_aspect_into(aspect, max)
+    rect.pos = margin + (max - rect.size)/2
+    return rect
+}
+
 @(require_results)
 mat3_translate :: proc "contextless" (v: vec2) -> mat3 {
 	return {

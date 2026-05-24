@@ -150,7 +150,6 @@ board: grid.Grid(Cell)
 
 // updated every fame
 window_size: Vec2
-board_rect:  Rect
 camera:      k2.Camera
 mouse_pos:   Vec2
 mouse_world: Vec2
@@ -169,7 +168,6 @@ BOARD_X           :: 128
 BOARD_Y           :: 164
 BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
-BOARD_AR          :: f32(BOARD_X)/f32(BOARD_Y)
 BOARD_RECT_MARGIN :: 10
 
 get_board_rect :: proc () -> (rect: Rect) {
@@ -501,11 +499,7 @@ game_init :: proc () {
 
 update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
-    board_rect  = get_board_rect()
-    camera      = k2.Camera{
-        offset = board_rect.pos,
-        zoom   = board_rect.size.x / BOARD_SIZE.x, // same as y because board rect preserves aspect
-    }
+    camera      = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
     mouse_pos   = k2.get_mouse_position()
     mouse_world = k2.screen_to_world(mouse_pos, camera)
 }
@@ -994,25 +988,6 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 	return true
 }
 
-update :: proc (dt: f32) -> bool {
-
-    update_frame_globals()
-    update_companies()
-    update_hover()
-    update_click()
-    update_automatic()
-    update_troops(dt)
-    update_arrows(dt)
-
-    if k2.key_went_down(.Q) {
-        return false
-    }
-    if k2.key_went_down(.R) {
-        game_init()
-    }
-    return true
-}
-
 draw_board :: proc () {
     k2.draw_rect(k2_rect({0, BOARD_SIZE}), PALETTE_COLOR_3)
 }
@@ -1179,6 +1154,25 @@ draw_ui :: proc () {
 
 frame :: proc (dt: f32) -> bool {
 
+    update_frame_globals()
+    update_companies()
+    update_hover()
+    update_click()
+    update_automatic()
+    update_troops(dt)
+    update_arrows(dt)
+
+    if k2.key_went_down(.Q) {
+        return false
+    }
+    if k2.key_went_down(.R) {
+        game_init()
+    }
+    if k2.key_went_down(.Escape) {
+        should_display_menu = true
+    }
+
+
     k2.clear(PALETTE_COLOR_4)
 
     k2.set_camera(camera)
@@ -1194,6 +1188,8 @@ frame :: proc (dt: f32) -> bool {
     k2.set_camera(nil)
 
     draw_ui()
+
+    menu_frame()
 
     return true
 }

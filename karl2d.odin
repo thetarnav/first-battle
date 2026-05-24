@@ -11,6 +11,14 @@ k2_rect :: proc (rect: Rect) -> k2.Rect {
     }
 }
 
+k2_camera_fit_aspect :: proc (aspect: Vec2, margin: Vec2 = 0) -> k2.Camera {
+    rect := rect_fit_aspect_max(aspect, window_size, margin)
+    return {
+        offset = rect.pos,
+        zoom   = rect.size.x / aspect.x, // same as y because rect preserves aspect
+    }
+}
+
 draw_texture :: proc (
     tex: k2.Texture,
     world_rect: Rect,
