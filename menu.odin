@@ -64,5 +64,22 @@ menu_frame :: proc () {
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, k2.GREEN)
     }
 
+    {
+        size: Vec2 = {60, 40}
+        rect: Rect = {
+            UI_WORLD_SIZE/2 - size/2,
+            size,
+        }
+
+        if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
+            should_display_menu = false
+        }
+
+        k2.draw_rect_vec(rect.pos, rect.size, k2.GREEN)
+    }
+
+    if k2.key_went_down(.Enter) {
+        should_display_menu = false
+    }
 }
 
