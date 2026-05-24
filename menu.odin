@@ -52,7 +52,8 @@ menu_frame :: proc () {
         }
 
         if slider_dragging {
-            slider_value = clamp((mouse_world.x - slider_rect.pos.x) / slider_rect.size.x, 0, 1)
+            slider_value = clamp((mouse_world.x - slider_rect.pos.x) / slider_rect.size.x, 0.3, 0.7)
+            game_init()
         }
 
         if slider_dragging && k2.mouse_button_went_up(.Left) {

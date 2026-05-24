@@ -463,7 +463,10 @@ game_init :: proc () {
             comp.side   = army.side
             comp.idx    = compi
             comp.kind   = initial.kind
-            comp.units  = make([]Troop_Idx, initial.count)
+
+            units_count_ratio := slider_value if side == .Player else 1-slider_value
+            units_count := int(f32(initial.count) / (units_count_ratio*2))
+            comp.units = make([]Troop_Idx, units_count)
 
             comp_coord := initial.pos
             if army.side == .Player {
@@ -1155,12 +1158,15 @@ draw_ui :: proc () {
 frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
-    update_companies()
-    update_hover()
-    update_click()
-    update_automatic()
-    update_troops(dt)
-    update_arrows(dt)
+
+    if !should_display_menu {
+        update_companies()
+        update_hover()
+        update_click()
+        update_automatic()
+        update_troops(dt)
+        update_arrows(dt)
+    }
 
     if k2.key_went_down(.Q) {
         return false
