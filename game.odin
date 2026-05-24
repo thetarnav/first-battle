@@ -489,7 +489,7 @@ game_init :: proc () {
                 s.info.compi = compi
 
                 rot: f32 = 0 if army.side == .Player else math.PI
-                pos := each_army_goal_pos(cell_center(comp_celli), rot, i, initial.count)
+                pos := each_army_goal_pos(cell_center(comp_celli), rot, i, units_count)
                 troop_set_pos_force(s, pos)
 
                 s.movement.path = make([dynamic]Cell_Idx)
