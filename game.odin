@@ -730,17 +730,6 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
                 dist := la.length(etroop.pos - troop.pos)
 
-                if dist < ARROW_RANGE {
-                    // no need to move
-                    troop.movement.target = troop_celli
-
-                    // begin shooting
-                    troop.shooting.time = rand.float32_range(2600, 4200)
-                    troop.shooting.target = etroopi
-                    troop.combat.in_fight += 1
-                    return
-                }
-
                 if dist < min_dist {
                     min_dist = dist
                     min_troopi = etroopi
@@ -749,6 +738,17 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
             etroopi := min_troopi.? or_return
             etroop  := troop_get(etroopi)
+
+            if min_dist < ARROW_RANGE {
+                // no need to move
+                troop.movement.target = troop_celli
+
+                // begin shooting
+                troop.shooting.time = rand.float32_range(2600, 4200)
+                troop.shooting.target = etroopi
+                troop.combat.in_fight += 1
+                return
+            }
 
             diff := etroop.pos - troop.pos
             diff -= la.normalize(diff) * (ARROW_RANGE-RANGE_MARGIN)
