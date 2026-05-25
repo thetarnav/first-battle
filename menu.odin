@@ -35,7 +35,6 @@ menu_frame :: proc () {
 
         if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
             automatic[side] = !enabled
-            game_initalized = false
         }
 
         draw_texture(
