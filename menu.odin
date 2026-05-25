@@ -1,5 +1,6 @@
 package first_battle
 
+import "core:math"
 import "core:fmt"
 import k2 "./karl2d"
 
@@ -52,7 +53,25 @@ menu_frame :: proc () {
         }
 
         if slider_dragging {
-            slider_value = clamp((mouse_world.x - slider_rect.pos.x) / slider_rect.size.x, 0.3, 0.7)
+
+            // 1. clamps the value to min_v and max_v
+            // 2. rounds the value to number of steps—discrete positions
+            //
+            // example:
+            //
+            //     stepped_range_value(value, 0, 1, 7) // 0, 1/6, 1/3, ..., 1
+            stepped_range_value :: proc(value, min_v, max_v: f32, steps: int) -> f32 {
+                if steps <= 1 {
+                    return min_v
+                }
+
+                step_size := (max_v - min_v) / f32(steps - 1)
+                i := math.round((value - min_v) / step_size)
+                return clamp(min_v + i * step_size, min_v, max_v)
+            }
+
+            slider_value = (mouse_world.x - slider_rect.pos.x) / slider_rect.size.x
+            slider_value = stepped_range_value(slider_value, 0.3, 0.7, 7)
             game_init()
         }
 
