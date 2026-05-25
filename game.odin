@@ -156,7 +156,7 @@ mouse_world: Vec2
 
 tex_atlas: k2.Texture
 
-ARROW_RANGE      :: 54
+ARROW_RANGE      :: 58
 ARROW_DAMPING    :: 0.996
 ARROW_DAMAGE     :: 1
 ARROW_SPEED_INIT :: 0.3
@@ -839,11 +839,14 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             target_pos := target.pos + target.movement.velocity + miss_by
             target_celli := cell_idx_from_pos(target_pos) or_break shooting
 
+            dist := la.distance(troop.pos, target_pos)
+            speed := dist * math.ln(f32(1) / ARROW_DAMPING) + rand.float32_range(0, 0.16)
+
             append(&arrows, Arrow{
                 from  = troop.pos,
                 pos   = troop.pos,
                 end   = target_celli,
-                speed = ARROW_SPEED_INIT,
+                speed = speed,
             })
 
             troop_apply_force(troop, troop_cell_idx, dt)
