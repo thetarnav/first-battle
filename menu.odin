@@ -1,7 +1,6 @@
 package first_battle
 
 import "core:math"
-import "core:fmt"
 import k2 "./karl2d"
 
 
@@ -25,23 +24,28 @@ menu_frame :: proc () {
         k2.ORANGE,
     )
 
-    {
-        p: Vec2 = {0, UI_WORLD_SIZE.y} - {0, 60}
-        r: Rect = {p, 40}
+    // automatic
+    for side in Army_Side {
+        enabled := is_automatic(side)
 
-        hovers := point_in_rect(mouse_world, r)
+        rect: Rect = {{0, UI_WORLD_SIZE.y - 60}, 40}
+        if side == .Enemy {
+            rect.pos.x = UI_WORLD_SIZE.x - rect.size.x
+        }
 
-        if hovers && k2.mouse_button_went_down(.Left) {
-            fmt.println("Hello")
+        if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
+            automatic[side] = !enabled
+            game_initalized = false
         }
 
         draw_texture(
             tex_atlas,
-            r,
-            atlas_rects[.Automatic_On if hovers else .Automatic_Off],
+            rect,
+            atlas_rects[.Automatic_On if enabled else .Automatic_Off],
         )
     }
 
+    // balance
     {
         slider_rect: Rect = {
             {10, UI_WORLD_SIZE.y - 10},

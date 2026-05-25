@@ -135,7 +135,7 @@ army_enemy  := &armies[.Enemy]
 
 automatic := [Army_Side]bool{
     .Player = false,
-    .Enemy  = false,
+    .Enemy  = true,
 }
 is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 
