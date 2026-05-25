@@ -70,9 +70,13 @@ menu_frame :: proc () {
                 return clamp(min_v + i * step_size, min_v, max_v)
             }
 
-            slider_value = (mouse_world.x - slider_rect.pos.x) / slider_rect.size.x
-            slider_value = stepped_range_value(slider_value, 0.3, 0.7, 7)
-            game_init()
+            new_value := (mouse_world.x - slider_rect.pos.x) / slider_rect.size.x
+            new_value = stepped_range_value(new_value, 0.3, 0.7, 7)
+
+            if new_value != slider_value {
+                slider_value = new_value
+                game_initalized = false
+            }
         }
 
         if slider_dragging && k2.mouse_button_went_up(.Left) {

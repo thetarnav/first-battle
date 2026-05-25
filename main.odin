@@ -5,17 +5,14 @@ import "core:fmt"
 import k2 "./karl2d"
 
 main :: proc () {
-    init()
-    for step() {}
-    shutdown()
-}
-
-init :: proc () {
     k2.init(1280, 720, "Greetings from Karl2D!", {
         window_mode = .Windowed_Resizable,
         // window_mode = .Borderless_Fullscreen,
     })
-    game_init()
+
+    for step() {}
+
+    shutdown()
 }
 
 MAX_FPS :: 60.0

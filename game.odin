@@ -423,7 +423,12 @@ troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
     }
 }
 
+game_initalized: bool
+
 game_init :: proc () {
+
+    if game_initalized do return
+    game_initalized = true
 
     // clear previous state
     armies    = {}
@@ -1159,6 +1164,8 @@ frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
 
+    game_init()
+
     if !should_display_menu {
         update_companies()
         update_hover()
@@ -1172,7 +1179,7 @@ frame :: proc (dt: f32) -> bool {
         return false
     }
     if k2.key_went_down(.R) {
-        game_init()
+        game_initalized = false
     }
     if k2.key_went_down(.Escape) {
         should_display_menu = true
