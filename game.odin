@@ -477,7 +477,7 @@ game_init :: proc () {
 
             army.units[ci] = compi
 
-            comp.side   = army.side
+            comp.side   = side
             comp.idx    = compi
             comp.kind   = initial.kind
 
@@ -486,7 +486,7 @@ game_init :: proc () {
             comp.units = make([]Troop_Idx, units_count)
 
             comp_coord := initial.pos
-            if army.side == .Player {
+            if side == .Player {
                 comp_coord.y = BOARD_Y - comp_coord.y
             }
 
@@ -501,11 +501,11 @@ game_init :: proc () {
                 append_nothing_soa(&troops)
 
                 s := troop_get(si)
-                s.info.side  = army.side
+                s.info.side  = side
                 s.info.si    = si
                 s.info.compi = compi
 
-                rot: f32 = 0 if army.side == .Player else math.PI
+                rot: f32 = 0 if side == .Player else math.PI
                 pos := each_army_goal_pos(cell_center(comp_celli), rot, i, units_count)
                 troop_set_pos_force(s, pos)
 
