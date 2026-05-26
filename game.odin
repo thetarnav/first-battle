@@ -1013,7 +1013,7 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 }
 
 draw_board :: proc () {
-    k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
+    k2.draw_rect_vec(0, BOARD_SIZE, COLOR_BOARD)
 }
 
 draw_troop_shadows :: proc () {
