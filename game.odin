@@ -119,12 +119,21 @@ unit_config := [Unit_Kind]Unit_Config{
     .Archers  = {color={80,  250,  60}, accel=0.000034, frict=0.992,  dmg_static=0.04, dmg_move=6,   armor=0.4},
 }
 
+COLOR_BG           :: PALETTE_COLOR_10
+COLOR_BOARD        :: PALETTE_COLOR_4
+COLOR_SHADOW       :: PALETTE_COLOR_10
+COLOR_PLAYER_LIGHT :: PALETTE_COLOR_9
+COLOR_PLAYER_DARK  :: PALETTE_COLOR_7
+COLOR_ENEMY_LIGHT  :: PALETTE_COLOR_2
+COLOR_ENEMY_DARK   :: PALETTE_COLOR_1
+COLOR_ARROWS       :: PALETTE_COLOR_1
+
 Army_Colors :: struct {
     light, dark: Color,
 }
 army_colors := [Army_Side]Army_Colors{
-    .Player = {light=PALETTE_COLOR_6, dark=PALETTE_COLOR_2},
-    .Enemy  = {light=PALETTE_COLOR_8, dark=PALETTE_COLOR_9},
+    .Player = {light=COLOR_PLAYER_LIGHT, dark=COLOR_PLAYER_DARK},
+    .Enemy  = {light=COLOR_ENEMY_LIGHT,  dark=COLOR_ENEMY_DARK},
 }
 
 state_arena: runtime.Arena
@@ -1000,14 +1009,14 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 }
 
 draw_board :: proc () {
-    k2.draw_rect(k2_rect({0, BOARD_SIZE}), PALETTE_COLOR_3)
+    k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
 }
 
 draw_troop_shadows :: proc () {
     for troop, i in troops {
         si := Troop_Idx(i)
         troop_is_alive(si) or_continue
-        k2.draw_circle(troop.pos, 3, PALETTE_COLOR_4, segments=8)
+        k2.draw_circle(troop.pos, 3, COLOR_SHADOW, segments=8)
     }
 }
 
@@ -1097,7 +1106,7 @@ draw_arrows :: proc () {
         line[1] = vec2_rotate(line[1], angle)
         line[0] += arrow.pos
         line[1] += arrow.pos
-        k2.draw_line(line[0], line[1], 0.2, k2.LIGHT_BROWN)
+        k2.draw_line(line[0], line[1], 0.2, COLOR_ARROWS)
     }
 }
 
@@ -1189,7 +1198,7 @@ frame :: proc (dt: f32) -> bool {
     }
 
 
-    k2.clear(PALETTE_COLOR_4)
+    k2.clear(COLOR_BG)
 
     k2.set_camera(camera)
 

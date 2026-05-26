@@ -480,6 +480,7 @@ rect_to_points :: proc "contextless" (r: Rect) -> [4]vec2 {
 rect :: #force_inline proc "contextless" (s, e: vec2) -> Rect {
     return {s, e-s}
 }
+rect_from_vec :: rect
 @require_results
 rect_transform :: proc "contextless" (r: Rect, m: mat3) -> Rect {
 	points := rect_to_points(r)

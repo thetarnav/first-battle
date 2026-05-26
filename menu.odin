@@ -9,37 +9,89 @@ should_display_menu: bool = true
 slider_value: f32 = 0.5
 slider_dragging: bool = false
 
+draw_border :: proc (rect: Rect) {
+
+    tex_tl := atlas_rects[.Border_TL]
+    tex_tr := atlas_rects[.Border_TR]
+    tex_bl := atlas_rects[.Border_BL]
+    tex_br := atlas_rects[.Border_BR]
+    tex_t  := atlas_rects[.Border_T]
+    tex_b  := atlas_rects[.Border_B]
+    tex_l  := atlas_rects[.Border_L]
+    tex_r  := atlas_rects[.Border_R]
+
+    // fill background
+    k2.draw_rect_vec(rect.pos + tex_tl.size, rect.size - tex_tl.size - tex_br.size, COLOR_BG)
+
+    // corners
+    draw_texture(tex_atlas, {rect.pos, tex_tl.size}, tex_tl)
+    draw_texture(tex_atlas, {rect.pos + {rect.size.x - tex_tr.size.x, 0}, tex_tr.size}, tex_tr)
+    draw_texture(tex_atlas, {rect.pos + {0, rect.size.y - tex_bl.size.y}, tex_bl.size}, tex_bl)
+    draw_texture(tex_atlas, {rect.pos + rect.size - tex_br.size, tex_br.size}, tex_br)
+
+    // top border
+    top_rect := Rect{
+        rect.pos + {tex_tl.size.x, 0},
+        {rect.size.x - tex_tl.size.x - tex_tr.size.x, tex_t.size.y},
+    }
+    if top_rect.size.x > 0 {
+        draw_texture(tex_atlas, top_rect, tex_t)
+    }
+
+    // bottom border
+    bottom_rect := Rect{
+        rect.pos + {tex_bl.size.x, rect.size.y - tex_b.size.y},
+        {rect.size.x - tex_bl.size.x - tex_br.size.x, tex_b.size.y},
+    }
+    if bottom_rect.size.x > 0 {
+        draw_texture(tex_atlas, bottom_rect, tex_b)
+    }
+
+    // left border
+    left_rect := Rect{
+        rect.pos + {0, tex_tl.size.y},
+        {tex_l.size.x, rect.size.y - tex_tl.size.y - tex_bl.size.y},
+    }
+    if left_rect.size.y > 0 {
+        draw_texture(tex_atlas, left_rect, tex_l)
+    }
+
+    // right border
+    right_rect := Rect{
+        rect.pos + {rect.size.x - tex_r.size.x, tex_tr.size.y},
+        {tex_l.size.x, rect.size.y - tex_tr.size.y - tex_br.size.y},
+    }
+    if right_rect.size.y > 0 {
+        draw_texture(tex_atlas, right_rect, tex_r)
+    }
+}
+
 menu_frame :: proc () {
     if !should_display_menu do return
 
-    UI_WORLD_SIZE :: Vec2{1000, 1000}
+    UI_WORLD_SIZE :: Vec2{760, 760}
     camera := k2_camera_fit_aspect(UI_WORLD_SIZE, 10)
     k2.set_camera(camera)
 
     mouse_world := k2.screen_to_world(mouse_pos, camera)
 
-    k2.draw_rect_vec(
-        {0, UI_WORLD_SIZE.y} - {0, 60},
-        {100, 40},
-        k2.ORANGE,
-    )
-
     // automatic
     for side in Army_Side {
         enabled := is_automatic(side)
 
-        rect: Rect = {{0, UI_WORLD_SIZE.y - 60}, 40}
+        button_rect: Rect = {{20, UI_WORLD_SIZE.y - 100}, 60}
         if side == .Enemy {
-            rect.pos.x = UI_WORLD_SIZE.x - rect.size.x
+            button_rect.pos.x = UI_WORLD_SIZE.x - button_rect.size.x - button_rect.pos.x
         }
+        draw_border(button_rect)
 
-        if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
+        if point_in_rect(mouse_world, button_rect) && k2.mouse_button_went_down(.Left) {
             automatic[side] = !enabled
         }
 
         draw_texture(
             tex_atlas,
-            rect,
+            {button_rect.pos + 10, button_rect.size - 20},
             atlas_rects[.Automatic_On if enabled else .Automatic_Off],
         )
     }
@@ -86,7 +138,7 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, k2.RED)
+        draw_border(slider_rect)
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, k2.GREEN)
     }
 
