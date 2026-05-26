@@ -1013,7 +1013,7 @@ draw_board :: proc () {
     k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
 }
 draw_board_borer :: proc () {
-    draw_border(rect_extend({0, BOARD_SIZE}, 2), 0)
+    draw_border({0, BOARD_SIZE}, 0)
     // k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
 }
 

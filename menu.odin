@@ -11,6 +11,9 @@ slider_dragging: bool = false
 
 draw_border :: proc (rect: Rect, bg: Color = COLOR_BG) {
 
+    rect := rect
+    rect = rect_extend(rect, 2)
+
     tex_tl := atlas_rects[.Border_TL]
     tex_tr := atlas_rects[.Border_TR]
     tex_bl := atlas_rects[.Border_BL]
@@ -74,7 +77,7 @@ menu_frame :: proc () {
     if !should_display_menu do return
 
     // cover
-    k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 60})
+    k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 100})
 
     UI_PIXEL_SCALE :: 6.0
     camera := k2.Camera{zoom = UI_PIXEL_SCALE}
@@ -91,7 +94,7 @@ menu_frame :: proc () {
         tex_rect := atlas_rects[.Automatic_On if enabled else .Automatic_Off]
 
         MARGIN  :: 10
-        PADDING :: 4
+        PADDING :: 2
 
         button_rect: Rect = {{MARGIN, ui_world_size.y - 60}, tex_rect.size + PADDING*2}
         button_rect.pos.y -= button_rect.size.y
@@ -114,7 +117,7 @@ menu_frame :: proc () {
     // balance
     {
         MARGIN :: 10
-        H :: 20
+        H :: 12
         slider_rect: Rect = {
             {MARGIN, ui_world_size.y - MARGIN - H},
             {ui_world_size.x - MARGIN*2, H},
@@ -155,8 +158,10 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        draw_border(slider_rect)
-        k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, k2.GREEN)
+        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_BG)
+        k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
+        draw_border(slider_rect, 0)
+        k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
     }
 
     {
