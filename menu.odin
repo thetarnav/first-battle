@@ -97,7 +97,12 @@ menu_frame :: proc () {
     for side in Army_Side {
         enabled := is_automatic(side)
 
-        tex_rect := atlas_rects[.Automatic_On if enabled else .Automatic_Off]
+        tex_slice: Atlas_Slice
+        switch side {
+        case .Player: tex_slice = .Automatic_On_Player if enabled else .Automatic_Off_Player
+        case .Enemy:  tex_slice = .Automatic_On_Enemy  if enabled else .Automatic_Off_Enemy
+        }
+        tex_rect := atlas_rects[tex_slice]
 
         MARGIN  :: 10
         PADDING :: 2
@@ -113,20 +118,17 @@ menu_frame :: proc () {
             automatic[side] = !enabled
         }
 
-        draw_texture(
-            tex_atlas,
-            {button_rect.pos + PADDING, button_rect.size - PADDING*2},
-            atlas_rects[.Automatic_On if enabled else .Automatic_Off],
-        )
+        draw_texture(tex_atlas, {button_rect.pos + PADDING, button_rect.size - PADDING*2}, tex_rect)
     }
 
     // balance
     {
         MARGIN :: 10
-        H :: 12
+        SIZE :: 12
+
         slider_rect: Rect = {
-            {MARGIN, ui_world_size.y - MARGIN - H},
-            {ui_world_size.x - MARGIN*2, H},
+            {MARGIN, ui_world_size.y - MARGIN - SIZE},
+            {ui_world_size.x - MARGIN*2, SIZE},
         }
 
         if point_in_rect(mouse_world, slider_rect) && k2.mouse_button_went_down(.Left) {
@@ -170,18 +172,17 @@ menu_frame :: proc () {
         draw_border(slider_rect, 0)
     }
 
+    // Play button
     {
-        size: Vec2 = {60, 40}
-        rect: Rect = {
-            ui_world_size/2 - size/2,
-            size,
-        }
+        tex_rect := atlas_rects[.Play]
+        rect: Rect = {ui_world_size/2 - tex_rect.size/2, tex_rect.size}
 
         if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
             should_display_menu = false
         }
 
-        k2.draw_rect_vec(rect.pos, rect.size, k2.GREEN)
+        draw_border(rect_extend(rect, {4, 2}))
+        draw_texture(tex_atlas, rect, tex_rect)
     }
 
     if k2.key_went_down(.Enter) {
