@@ -1218,10 +1218,6 @@ frame :: proc (dt: f32) -> bool {
 
     k2.set_camera(nil)
 
-    if should_display_menu {
-        k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_ARROWS.rgb), 60})
-    }
-
     draw_ui()
 
     menu_frame()
