@@ -69,20 +69,27 @@ draw_border :: proc (rect: Rect) {
 menu_frame :: proc () {
     if !should_display_menu do return
 
-    UI_WORLD_SIZE :: Vec2{600, 600}
-    camera := k2_camera_fit_aspect(UI_WORLD_SIZE, 10)
+    UI_PIXEL_SCALE :: 6.0
+    camera := k2.Camera{zoom = UI_PIXEL_SCALE}
     k2.set_camera(camera)
     defer k2.set_camera(nil)
 
     mouse_world := k2.screen_to_world(mouse_pos, camera)
+    ui_world_size := window_size / UI_PIXEL_SCALE
 
     // automatic
     for side in Army_Side {
         enabled := is_automatic(side)
 
-        button_rect: Rect = {{20, UI_WORLD_SIZE.y - 100}, 60}
+        tex_rect := atlas_rects[.Automatic_On if enabled else .Automatic_Off]
+
+        MARGIN  :: 10
+        PADDING :: 4
+
+        button_rect: Rect = {{MARGIN, ui_world_size.y - 60}, tex_rect.size + PADDING*2}
+        button_rect.pos.y -= button_rect.size.y
         if side == .Enemy {
-            button_rect.pos.x = UI_WORLD_SIZE.x - button_rect.size.x - button_rect.pos.x
+            button_rect.pos.x = ui_world_size.x - button_rect.size.x - button_rect.pos.x
         }
         draw_border(button_rect)
 
@@ -92,7 +99,7 @@ menu_frame :: proc () {
 
         draw_texture(
             tex_atlas,
-            {button_rect.pos + 10, button_rect.size - 20},
+            {button_rect.pos + PADDING, button_rect.size - PADDING*2},
             atlas_rects[.Automatic_On if enabled else .Automatic_Off],
         )
     }
@@ -102,8 +109,8 @@ menu_frame :: proc () {
         MARGIN :: 10
         H :: 20
         slider_rect: Rect = {
-            {MARGIN, UI_WORLD_SIZE.y - MARGIN - H},
-            {UI_WORLD_SIZE.x - MARGIN*2, H},
+            {MARGIN, ui_world_size.y - MARGIN - H},
+            {ui_world_size.x - MARGIN*2, H},
         }
 
         if point_in_rect(mouse_world, slider_rect) && k2.mouse_button_went_down(.Left) {
@@ -148,7 +155,7 @@ menu_frame :: proc () {
     {
         size: Vec2 = {60, 40}
         rect: Rect = {
-            UI_WORLD_SIZE/2 - size/2,
+            ui_world_size/2 - size/2,
             size,
         }
 
