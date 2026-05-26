@@ -120,8 +120,10 @@ unit_config := [Unit_Kind]Unit_Config{
 }
 
 COLOR_BG           :: PALETTE_COLOR_10
+COLOR_UI           :: PALETTE_COLOR_3
 COLOR_BOARD        :: PALETTE_COLOR_4
 COLOR_SHADOW       :: PALETTE_COLOR_10
+COLOR_CORPSE       :: PALETTE_COLOR_6
 COLOR_PLAYER_LIGHT :: PALETTE_COLOR_9
 COLOR_PLAYER_DARK  :: PALETTE_COLOR_7
 COLOR_ENEMY_LIGHT  :: PALETTE_COLOR_2
@@ -159,6 +161,7 @@ board: grid.Grid(Cell)
 
 // updated every fame
 window_size: Vec2
+board_rect:  Rect // board rectangle on the screen
 camera:      k2.Camera
 mouse_pos:   Vec2
 mouse_world: Vec2
@@ -177,7 +180,7 @@ BOARD_X           :: 128
 BOARD_Y           :: 164
 BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
-BOARD_RECT_MARGIN :: 10
+BOARD_RECT_MARGIN :: 20
 
 get_board_rect :: proc () -> (rect: Rect) {
     max := window_size - BOARD_RECT_MARGIN*2
@@ -516,6 +519,7 @@ game_init :: proc () {
 
 update_frame_globals :: proc () {
     window_size = k2.get_screen_size()
+    board_rect  = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
     camera      = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
     mouse_pos   = k2.get_mouse_position()
     mouse_world = k2.screen_to_world(mouse_pos, camera)
@@ -1009,12 +1013,7 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 }
 
 draw_board :: proc () {
-    // draw_border({0, BOARD_SIZE}, COLOR_BOARD)
     k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
-}
-draw_board_borer :: proc () {
-    draw_border({0, BOARD_SIZE}, 0)
-    // k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
 }
 
 draw_troop_shadows :: proc () {
@@ -1214,7 +1213,6 @@ frame :: proc (dt: f32) -> bool {
     draw_arrows()
     draw_company_targets()
     draw_selected_company()
-    draw_board_borer()
 
     k2.set_camera(nil)
 

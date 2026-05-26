@@ -9,7 +9,7 @@ should_display_menu: bool = true
 slider_value: f32 = 0.5
 slider_dragging: bool = false
 
-draw_border :: proc (rect: Rect, bg: Color = COLOR_BG) {
+draw_border :: proc (rect: Rect, bg: Color = COLOR_UI) {
 
     rect := rect
     rect = rect_extend(rect, 2)
@@ -74,15 +74,21 @@ draw_border :: proc (rect: Rect, bg: Color = COLOR_BG) {
 }
 
 menu_frame :: proc () {
-    if !should_display_menu do return
 
     // cover
-    k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 100})
+    if should_display_menu {
+        k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 100})
+    }
 
-    UI_PIXEL_SCALE :: 6.0
+    UI_PIXEL_SCALE :: 4.0
     camera := k2.Camera{zoom = UI_PIXEL_SCALE}
     k2.set_camera(camera)
     defer k2.set_camera(nil)
+
+    // board border
+    draw_border({board_rect.pos / UI_PIXEL_SCALE, board_rect.size / UI_PIXEL_SCALE}, 0)
+
+    if !should_display_menu do return
 
     mouse_world := k2.screen_to_world(mouse_pos, camera)
     ui_world_size := window_size / UI_PIXEL_SCALE
@@ -158,10 +164,10 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_BG)
+        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_UI)
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
-        draw_border(slider_rect, 0)
         k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
+        draw_border(slider_rect, 0)
     }
 
     {
