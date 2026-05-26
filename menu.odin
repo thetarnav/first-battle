@@ -9,7 +9,7 @@ should_display_menu: bool = true
 slider_value: f32 = 0.5
 slider_dragging: bool = false
 
-draw_border :: proc (rect: Rect) {
+draw_border :: proc (rect: Rect, bg: Color = COLOR_BG) {
 
     tex_tl := atlas_rects[.Border_TL]
     tex_tr := atlas_rects[.Border_TR]
@@ -21,7 +21,11 @@ draw_border :: proc (rect: Rect) {
     tex_r  := atlas_rects[.Border_R]
 
     // fill background
-    k2.draw_rect_vec(rect.pos + tex_tl.size, rect.size - tex_tl.size - tex_br.size, COLOR_BG)
+    if bg.a > 0 {
+        bg_rect := Rect{rect.pos + tex_tl.size, rect.size - tex_tl.size - tex_br.size}
+        bg_rect = rect_extend(bg_rect, 4)
+        k2.draw_rect_vec(bg_rect.pos, bg_rect.size, bg)
+    }
 
     // corners
     draw_texture(tex_atlas, {rect.pos, tex_tl.size}, tex_tl)
@@ -68,6 +72,9 @@ draw_border :: proc (rect: Rect) {
 
 menu_frame :: proc () {
     if !should_display_menu do return
+
+    // cover
+    k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 60})
 
     UI_PIXEL_SCALE :: 6.0
     camera := k2.Camera{zoom = UI_PIXEL_SCALE}

@@ -1009,7 +1009,12 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 }
 
 draw_board :: proc () {
+    // draw_border({0, BOARD_SIZE}, COLOR_BOARD)
     k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
+}
+draw_board_borer :: proc () {
+    draw_border(rect_extend({0, BOARD_SIZE}, 2), 0)
+    // k2.draw_rect(k2_rect({0, BOARD_SIZE}), COLOR_BOARD)
 }
 
 draw_troop_shadows :: proc () {
@@ -1209,8 +1214,13 @@ frame :: proc (dt: f32) -> bool {
     draw_arrows()
     draw_company_targets()
     draw_selected_company()
+    draw_board_borer()
 
     k2.set_camera(nil)
+
+    if should_display_menu {
+        k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_ARROWS.rgb), 60})
+    }
 
     draw_ui()
 
