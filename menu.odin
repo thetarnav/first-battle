@@ -1,6 +1,7 @@
 package first_battle
 
 import "core:math"
+import la "core:math/linalg"
 import k2 "./karl2d"
 
 
@@ -95,7 +96,7 @@ menu_frame :: proc () {
     if !should_display_menu do return
 
     mouse_world = k2.screen_to_world(mouse_pos, camera)
-    ui_world_size := window_size / UI_PIXEL_SCALE
+    ui_world_size := la.floor(window_size / UI_PIXEL_SCALE)
     ui_center := ui_world_size/2
 
     // Play button
