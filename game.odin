@@ -205,10 +205,7 @@ cell_get :: proc (idx: Cell_Idx) -> (cell: ^Cell) {
 cell_coord :: proc (idx: Cell_Idx) -> (coord: Coord) {
     return grid.coord(board, idx)
 }
-cell_idx :: proc (coord: Coord) -> (idx: Cell_Idx) {
-    return Cell_Idx(grid.idx(board, coord))
-}
-cell_idx_safe :: proc (coord: Coord) -> (idx: Cell_Idx, ok: bool) {
+cell_idx :: proc (coord: Coord) -> (idx: Cell_Idx, ok: bool) #optional_ok {
     return Cell_Idx(grid.idx_safe(board, coord) or_return), true
 }
 cell_center :: proc (idx: Cell_Idx) -> (pos: Vec2) {
@@ -306,7 +303,7 @@ find_first_free_cell :: proc (origin: Vec2, troopi: Troop_Idx) -> Cell_Idx {
 
     for offset: Coord; /**/; offset = grid.next_surrounding_cell(offset) {
 
-        celli := cell_idx_safe(Coord(origin) + offset) or_continue
+        celli := cell_idx(Coord(origin) + offset) or_continue
         if cell_taken(celli, troopi) do continue
         return celli
     }
@@ -538,7 +535,7 @@ update_hover :: proc () -> (ok: bool) {
     for _ in 0..<steps {
         defer coord = grid.next_surrounding_cell(coord)
 
-        celli := cell_idx_safe(origin + coord) or_continue
+        celli := cell_idx(origin + coord) or_continue
         troopi := cell_get(celli).troop.? or_continue
         if troop_is_dead(troopi) do continue
 
@@ -717,7 +714,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
         // already next to an enemy
         for dir in grid.DIRECTION_VECTORS {
 
-            cidx   := cell_idx_safe(troop_coord + dir) or_continue
+            cidx   := cell_idx(troop_coord + dir) or_continue
             ctroop := cell_troop(cidx) or_continue
             if ctroop.info.compi != t do continue
 
@@ -787,7 +784,7 @@ update_troop_target :: proc (troopi: Troop_Idx, dt: f32) -> (moved: bool) {
 
             is_accessable: {
                 for dir in grid.DIRECTION_VECTORS {
-                    cidx := cell_idx_safe(ucoord + dir) or_continue
+                    cidx := cell_idx(ucoord + dir) or_continue
                     if cell_taken(cidx, troopi) do continue
                     break is_accessable
                 }
@@ -875,7 +872,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
             // attack
             for dir in grid.DIRECTION_VECTORS {
-                cidx := cell_idx_safe(troop_coord + dir) or_continue
+                cidx := cell_idx(troop_coord + dir) or_continue
                 ctroop := cell_troop(cidx) or_continue
                 troop_attack(troop, ctroop) or_continue
                 break
@@ -996,7 +993,7 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 		}
 
 		check_hit: if do_check_hit {
-			pos_celli := cell_idx(pos_coord)
+			pos_celli := cell_idx(pos_coord) or_break check_hit
 			pos_troop := cell_troop(pos_celli) or_break check_hit
 			if troop_is_dead(pos_troop.info.si) do break check_hit
 
