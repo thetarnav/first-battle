@@ -9,7 +9,7 @@ should_display_menu: bool = true
 slider_value: f32 = 0.5
 slider_dragging: bool = false
 
-draw_border :: proc (rect: Rect, bg: Color = COLOR_UI) {
+draw_border :: proc (rect: Rect, bg: Color = COLOR_ENEMY_LIGHT) {
 
     rect := rect
     rect = rect_extend(rect, 2)
@@ -192,7 +192,7 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_UI)
+        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_ENEMY_LIGHT)
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
         k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
         draw_border(slider_rect, 0)
