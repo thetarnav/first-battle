@@ -119,8 +119,9 @@ unit_config := [Unit_Kind]Unit_Config{
     .Archers  = {color={80,  250,  60}, accel=0.000034, frict=0.992,  dmg_static=0.04, dmg_move=6,   armor=0.4},
 }
 
-COLOR_BG           :: PALETTE_COLOR_10
+COLOR_BG           :: PALETTE_COLOR_3
 COLOR_UI           :: PALETTE_COLOR_3
+COLOR_UI_HOVER     :: PALETTE_COLOR_2
 COLOR_BOARD        :: PALETTE_COLOR_4
 COLOR_SHADOW       :: PALETTE_COLOR_10
 COLOR_CORPSE       :: PALETTE_COLOR_6

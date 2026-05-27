@@ -10,7 +10,7 @@ should_display_menu: bool = true
 slider_value: f32 = 0.5
 slider_dragging: bool = false
 
-draw_border :: proc (rect: Rect, bg: Color = COLOR_ENEMY_LIGHT) {
+draw_border :: proc (rect: Rect, bg: Color = COLOR_UI) {
 
     rect := rect
     rect = rect_extend(rect, 2)
@@ -31,7 +31,7 @@ draw_border :: proc (rect: Rect, bg: Color = COLOR_ENEMY_LIGHT) {
 
         bg := bg
         if point_in_rect(mouse_world, rect) {
-            bg = COLOR_UI
+            bg = COLOR_UI_HOVER
         }
         k2.draw_rect_vec(bg_rect.pos, bg_rect.size, bg)
     }
@@ -82,7 +82,7 @@ menu_frame :: proc () {
 
     // cover
     if should_display_menu {
-        k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BG.rgb), 100})
+        k2.draw_rect_vec(0, k2.get_screen_size(), {expand_values(COLOR_BOARD.rgb), 120})
     }
 
     UI_PIXEL_SCALE :: 4.0
@@ -198,9 +198,9 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        bg := COLOR_ENEMY_LIGHT
+        bg := COLOR_UI
         if point_in_rect(mouse_world, slider_rect) {
-            bg = COLOR_UI
+            bg = COLOR_UI_HOVER
         }
         k2.draw_rect_vec(slider_rect.pos, slider_rect.size, bg)
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
