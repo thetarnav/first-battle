@@ -27,6 +27,11 @@ draw_border :: proc (rect: Rect, bg: Color = COLOR_ENEMY_LIGHT) {
     if bg.a > 0 {
         bg_rect := Rect{rect.pos + tex_tl.size, rect.size - tex_tl.size - tex_br.size}
         bg_rect = rect_extend(bg_rect, 4)
+
+        bg := bg
+        if point_in_rect(mouse_world, rect) {
+            bg = COLOR_UI
+        }
         k2.draw_rect_vec(bg_rect.pos, bg_rect.size, bg)
     }
 
@@ -89,7 +94,7 @@ menu_frame :: proc () {
 
     if !should_display_menu do return
 
-    mouse_world := k2.screen_to_world(mouse_pos, camera)
+    mouse_world = k2.screen_to_world(mouse_pos, camera)
     ui_world_size := window_size / UI_PIXEL_SCALE
     ui_center := ui_world_size/2
 
@@ -192,7 +197,11 @@ menu_frame :: proc () {
             slider_dragging = false
         }
 
-        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, COLOR_ENEMY_LIGHT)
+        bg := COLOR_ENEMY_LIGHT
+        if point_in_rect(mouse_world, slider_rect) {
+            bg = COLOR_UI
+        }
+        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, bg)
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
         k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
         draw_border(slider_rect, 0)
