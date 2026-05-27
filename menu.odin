@@ -30,7 +30,6 @@ draw_border :: proc (rect: Rect, bg: Color = COLOR_UI) {
         k2.draw_rect_vec(bg_rect.pos, bg_rect.size, bg)
     }
 
-    // corners
     draw_texture(tex_atlas, {rect.pos, tex_tl.size}, tex_tl)
     draw_texture(tex_atlas, {rect.pos + {rect.size.x - tex_tr.size.x, 0}, tex_tr.size}, tex_tr)
     draw_texture(tex_atlas, {rect.pos + {0, rect.size.y - tex_bl.size.y}, tex_bl.size}, tex_bl)
@@ -92,6 +91,32 @@ menu_frame :: proc () {
 
     mouse_world := k2.screen_to_world(mouse_pos, camera)
     ui_world_size := window_size / UI_PIXEL_SCALE
+    ui_center := ui_world_size/2
+
+    // Play button
+    play_tex_rect := atlas_rects[.Play]
+    play_text_rect: Rect = {
+        {ui_center.x - play_tex_rect.size.x/2, ui_center.y},
+        play_tex_rect.size,
+    }
+    play_text_rect.y -= play_text_rect.size.y/2
+    play_rect := rect_extend(play_text_rect, {4, 2})
+
+    if point_in_rect(mouse_world, play_text_rect) && k2.mouse_button_went_down(.Left) {
+        should_display_menu = false
+    }
+
+    draw_border(play_rect)
+    draw_texture(tex_atlas, play_text_rect, play_tex_rect)
+
+    // Title
+    title_tex_rect := atlas_rects[.Title]
+    title_rect: Rect = {
+        {ui_center.x - title_tex_rect.size.x/2, play_rect.pos.y - title_tex_rect.size.y - 12},
+        title_tex_rect.size,
+    }
+
+    draw_texture(tex_atlas, title_rect, title_tex_rect)
 
     // automatic
     for side in Army_Side {
@@ -104,13 +129,15 @@ menu_frame :: proc () {
         }
         tex_rect := atlas_rects[tex_slice]
 
-        MARGIN  :: 10
         PADDING :: 2
 
-        button_rect: Rect = {{MARGIN, ui_world_size.y - 60}, tex_rect.size + PADDING*2}
-        button_rect.pos.y -= button_rect.size.y
+        button_rect: Rect = {
+            {play_rect.pos.x - tex_rect.size.x - 16, ui_center.y},
+            tex_rect.size + PADDING*2,
+        }
+        button_rect.pos.y -= button_rect.size.y/2
         if side == .Enemy {
-            button_rect.pos.x = ui_world_size.x - button_rect.size.x - button_rect.pos.x
+            button_rect.pos.x = ui_center.x - (button_rect.pos.x + button_rect.size.x - ui_center.x)
         }
         draw_border(button_rect)
 
@@ -123,12 +150,11 @@ menu_frame :: proc () {
 
     // balance
     {
-        MARGIN :: 10
-        SIZE :: 12
+        size := Vec2{128, 12}
 
         slider_rect: Rect = {
-            {MARGIN, ui_world_size.y - MARGIN - SIZE},
-            {ui_world_size.x - MARGIN*2, SIZE},
+            {ui_center.x - size.x/2, play_rect.pos.y + play_rect.size.y + 14},
+            size,
         }
 
         if point_in_rect(mouse_world, slider_rect) && k2.mouse_button_went_down(.Left) {
@@ -170,19 +196,6 @@ menu_frame :: proc () {
         k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
         k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
         draw_border(slider_rect, 0)
-    }
-
-    // Play button
-    {
-        tex_rect := atlas_rects[.Play]
-        rect: Rect = {ui_world_size/2 - tex_rect.size/2, tex_rect.size}
-
-        if point_in_rect(mouse_world, rect) && k2.mouse_button_went_down(.Left) {
-            should_display_menu = false
-        }
-
-        draw_border(rect_extend(rect, {4, 2}))
-        draw_texture(tex_atlas, rect, tex_rect)
     }
 
     if k2.key_went_down(.Enter) {
