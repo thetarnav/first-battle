@@ -100,7 +100,7 @@ menu_frame :: proc () {
         play_tex_rect.size,
     }
     play_text_rect.y -= play_text_rect.size.y/2
-    play_rect := rect_extend(play_text_rect, {4, 2})
+    play_rect := rect_extend(play_text_rect, {5, 3})
 
     if point_in_rect(mouse_world, play_text_rect) && k2.mouse_button_went_down(.Left) {
         should_display_menu = false
