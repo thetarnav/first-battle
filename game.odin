@@ -97,10 +97,14 @@ Cell_Idx :: distinct u16
 
 @rodata
 initial_army_units: []struct {kind: Unit_Kind, pos: Coord, count: int} = {
-    {.Infantry, {23,  26}, 120},
-    {.Heavy,    {60,  40}, 80},
-    {.Riders,   {100, 20}, 80},
-    {.Archers,  {70,  20}, 80},
+    {.Riders,   {20,  40}, 50},
+    {.Heavy,    {22,  18}, 50},
+    {.Archers,  {54,  14}, 60},
+    {.Infantry, {52,  40}, 80},
+    {.Archers,  {86,  14}, 60},
+    {.Infantry, {86,  40}, 80},
+    {.Riders,   {120, 40}, 50},
+    {.Heavy,    {118, 18}, 50},
 }
 
 Unit_Config :: struct {
@@ -173,12 +177,13 @@ ARROW_RANGE      :: 58
 ARROW_DAMPING    :: 0.996
 ARROW_DAMAGE     :: 1
 ARROW_SPEED_INIT :: 0.3
+ARROW_SPEED_HIT  :: 0.03
 ARROW_SPEED_MIN  :: 0.01
 
 GOLDEN_RATIO  :: 1.618
 
-BOARD_X           :: 128
-BOARD_Y           :: 164
+BOARD_X           :: 140
+BOARD_Y           :: 180
 BOARD_N           :: BOARD_X*BOARD_Y
 BOARD_SIZE        :: Vec2{BOARD_X, BOARD_Y}
 BOARD_RECT_MARGIN :: 20
@@ -985,6 +990,10 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 			do_remove_after = true
 		}
 
+		if arrow.speed < ARROW_SPEED_HIT {
+			do_check_hit = true
+		}
+
 		end_coord := cell_coord(arrow.end)
 		pos_coord, _ := board_coord_from_pos(arrow.pos)
 		coord_diff := la.abs(end_coord - pos_coord)
@@ -1077,7 +1086,7 @@ draw_troops :: proc () {
             rot = PI
         }
 
-        max_side := f32(2.2)
+        max_side := f32(2.4)
         tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         if htroopi, has_hovered := hovered_troop.?;
            has_hovered && troop_company_idx(htroopi) == troop_company_idx(si) {
