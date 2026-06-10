@@ -155,57 +155,75 @@ menu_frame :: proc () {
     }
 
     // balance
+    slider_size := Vec2{128, 12}
+
+    slider_rect: Rect = {
+        {ui_center.x - slider_size.x/2, play_rect.pos.y + play_rect.size.y + 14},
+        slider_size,
+    }
+
+    if point_in_rect(mouse_world, slider_rect) && k2.mouse_button_went_down(.Left) {
+        slider_dragging = true
+    }
+
+    if slider_dragging {
+
+        // 1. clamps the value to min_v and max_v
+        // 2. rounds the value to number of steps—discrete positions
+        //
+        // example:
+        //
+        //     stepped_range_value(value, 0, 1, 7) // 0, 1/6, 1/3, ..., 1
+        stepped_range_value :: proc(value, min_v, max_v: f32, steps: int) -> f32 {
+            if steps <= 1 {
+                return min_v
+            }
+
+            step_size := (max_v - min_v) / f32(steps - 1)
+            i := math.round((value - min_v) / step_size)
+            return clamp(min_v + i * step_size, min_v, max_v)
+        }
+
+        new_value := (mouse_world.x - slider_rect.pos.x) / slider_rect.size.x
+        new_value = stepped_range_value(new_value, 0.3, 0.7, 7)
+
+        if new_value != slider_value {
+            slider_value = new_value
+            game_initalized = false
+        }
+    }
+
+    if slider_dragging && k2.mouse_button_went_up(.Left) {
+        slider_dragging = false
+    }
+
+    slider_bg := COLOR_UI
+    if point_in_rect(mouse_world, slider_rect) {
+        slider_bg = COLOR_UI_HOVER
+    }
+    k2.draw_rect_vec(slider_rect.pos, slider_rect.size, slider_bg)
+    k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
+    k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
+    draw_border(slider_rect, 0)
+
+    // mute sounds
     {
-        size := Vec2{128, 12}
+        tex_rect := atlas_rects[.Sound_Off if g_mute else .Sound_On]
 
-        slider_rect: Rect = {
-            {ui_center.x - size.x/2, play_rect.pos.y + play_rect.size.y + 14},
-            size,
+        PADDING :: 2
+
+        mute_rect: Rect
+        mute_rect.size = tex_rect.size + PADDING*2
+        mute_rect.pos.x = ui_center.x - mute_rect.size.x/2
+        mute_rect.pos.y = slider_rect.y + slider_rect.size.y + 20
+
+        draw_border(mute_rect)
+
+        if point_in_rect(mouse_world, mute_rect) && k2.mouse_button_went_down(.Left) {
+            audio_toggle_mute()
         }
 
-        if point_in_rect(mouse_world, slider_rect) && k2.mouse_button_went_down(.Left) {
-            slider_dragging = true
-        }
-
-        if slider_dragging {
-
-            // 1. clamps the value to min_v and max_v
-            // 2. rounds the value to number of steps—discrete positions
-            //
-            // example:
-            //
-            //     stepped_range_value(value, 0, 1, 7) // 0, 1/6, 1/3, ..., 1
-            stepped_range_value :: proc(value, min_v, max_v: f32, steps: int) -> f32 {
-                if steps <= 1 {
-                    return min_v
-                }
-
-                step_size := (max_v - min_v) / f32(steps - 1)
-                i := math.round((value - min_v) / step_size)
-                return clamp(min_v + i * step_size, min_v, max_v)
-            }
-
-            new_value := (mouse_world.x - slider_rect.pos.x) / slider_rect.size.x
-            new_value = stepped_range_value(new_value, 0.3, 0.7, 7)
-
-            if new_value != slider_value {
-                slider_value = new_value
-                game_initalized = false
-            }
-        }
-
-        if slider_dragging && k2.mouse_button_went_up(.Left) {
-            slider_dragging = false
-        }
-
-        bg := COLOR_UI
-        if point_in_rect(mouse_world, slider_rect) {
-            bg = COLOR_UI_HOVER
-        }
-        k2.draw_rect_vec(slider_rect.pos, slider_rect.size, bg)
-        k2.draw_rect_vec(slider_rect.pos, {slider_rect.size.x * slider_value, slider_rect.size.y}, COLOR_PLAYER_LIGHT)
-        k2.draw_rect_vec(slider_rect.pos + {slider_value * slider_rect.size.x - 1, 0}, {2, slider_rect.size.y}, COLOR_PLAYER_DARK)
-        draw_border(slider_rect, 0)
+        draw_texture(tex_atlas, {mute_rect.pos + PADDING, mute_rect.size - PADDING*2}, tex_rect)
     }
 
     if k2.key_went_down(.Enter) {

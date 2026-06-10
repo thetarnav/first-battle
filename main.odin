@@ -15,6 +15,7 @@ init :: proc () {
         window_mode = .Windowed_Resizable,
         // window_mode = .Borderless_Fullscreen,
     })
+    audio_init()
 }
 
 MAX_FPS :: 60.0
@@ -55,6 +56,7 @@ step :: proc () -> bool {
     k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
 
     k2.present()
+    audio_frame()
 
     free_all(context.temp_allocator)
 
