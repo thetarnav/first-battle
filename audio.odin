@@ -19,13 +19,12 @@ audio_init :: proc () {
 }
 
 audio_frame :: proc () {
+    if g_mute do return
     k2.update_audio_stream(songs_streams[active_song])
     if !k2.audio_stream_is_playing(songs_streams[active_song]) {
         k2.pause_audio_stream(songs_streams[active_song])
         active_song = (active_song+1) % len(songs_streams)
-        if !g_mute {
-            k2.play_audio_stream(songs_streams[active_song])
-        }
+        k2.play_audio_stream(songs_streams[active_song])
     }
 }
 
