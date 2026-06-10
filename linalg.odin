@@ -137,22 +137,6 @@ midpoint :: proc "contextless" (a, b: $T/[2]$S) -> T
 	return {(a.x + b.x) / 2, (a.y + b.y) / 2}
 }
 
-// cast_vec2 :: #force_inline proc "contextless" ($D: typeid, v: [2]$S) -> [2]D
-// 	where intrinsics.type_is_numeric(S),
-// 	      intrinsics.type_is_numeric(D) {
-// 	return {D(v.x), D(v.y)}
-// }
-array_cast :: la.array_cast
-@(require_results)
-cast_vec2 :: #force_inline proc "contextless" (v: $T/[2]$S) -> vec2
-	where intrinsics.type_is_numeric(S) {
-	return {f32(v.x), f32(v.y)}
-}
-@(require_results)
-cast_ivec2 :: #force_inline proc "contextless" (v: $T/[2]$S) -> ivec2
-	where intrinsics.type_is_numeric(S) {
-	return {i32(v.x), i32(v.y)}
-}
 @(require_results)
 vec2_to_vec3 :: #force_inline proc "contextless" (v: $T/[2]f32, z: f32 = 0) -> vec3 {
 	return {v.x, v.y, z}
