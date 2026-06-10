@@ -215,7 +215,7 @@ menu_frame :: proc () {
         mute_rect: Rect
         mute_rect.size = tex_rect.size + PADDING*2
         mute_rect.pos.x = ui_center.x - mute_rect.size.x/2
-        mute_rect.pos.y = slider_rect.y + slider_rect.size.y + 20
+        mute_rect.pos.y = slider_rect.y + slider_rect.size.y + 14
 
         draw_border(mute_rect)
 
