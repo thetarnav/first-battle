@@ -1,6 +1,7 @@
 package first_battle
 
 import k2 "./karl2d"
+import "core:math/rand"
 
 Sound_Effect_Kind :: enum {
     Sword_Slash,
@@ -13,12 +14,31 @@ Sound_Effect_Kind :: enum {
     Horse_Run,
 }
 
+SFX_Config :: struct {
+    volume:    f32,
+    pitch_var: f32,
+    cooldown:  f32,
+}
+
+SFX_GLOBAL_CAP :: 8
+
+sfx_config := [Sound_Effect_Kind]SFX_Config{
+    .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=0.08},
+    .Sword_Impact  = {volume=0.55, pitch_var=0.15, cooldown=0.08},
+    .Arrow_Swish   = {volume=0.35, pitch_var=0.2,  cooldown=0.05},
+    .Arrow_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=0.08},
+    .Shield_Impact = {volume=0.5,  pitch_var=0.1,  cooldown=0.08},
+    .Thud_Impact   = {volume=0.65, pitch_var=0.1,  cooldown=0.1},
+    .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0.3},
+    .Horse_Run     = {volume=0.3,  pitch_var=0.05, cooldown=0.4},
+}
+
 songs_bytes := [][]byte{
     #load("audio/montogoronto-dark-orchestral-battle-tension-395613.ogg"),
     #load("audio/rolandomat-epic-battle-song-182915.ogg"),
 }
 
-sound_effect_bytes := [Sound_Effect_Kind][][]byte{
+sfx_bytes := [Sound_Effect_Kind][][]byte{
     .Sword_Slash = {
         #load("audio/54427377-sword-slash-476148.ogg"),
         #load("audio/dragon-studio-sword-slice-393847.ogg"),
@@ -51,25 +71,102 @@ sound_effect_bytes := [Sound_Effect_Kind][][]byte{
     },
 }
 
+sfx_streams: [Sound_Effect_Kind][][dynamic]k2.Audio_Stream
+sfx_to_play: [Sound_Effect_Kind]int
+
 songs_streams: []k2.Audio_Stream
 active_song: int
 
 g_mute: bool
 
+play_sfx :: proc (kind: Sound_Effect_Kind) {
+    sfx_to_play[kind] += 1
+}
+
 audio_init :: proc () {
+    // create streams for all songs
     songs_streams = make([]k2.Audio_Stream, len(songs_bytes))
     for bytes, i in songs_bytes {
         songs_streams[i] = k2.load_audio_stream_from_bytes(bytes)
+    }
+    // create arrays for sfx
+    for &streams_by_sfx, kind in sfx_streams {
+        streams_by_sfx = make(type_of(streams_by_sfx), len(sfx_bytes[kind]))
+        for &streams in streams_by_sfx {
+            streams = make(type_of(streams))
+        }
     }
 }
 
 audio_frame :: proc () {
     if g_mute do return
+
+    // update music songs
     k2.update_audio_stream(songs_streams[active_song])
     if !k2.is_audio_stream_playing(songs_streams[active_song]) {
         k2.pause_audio_stream(songs_streams[active_song])
         active_song = (active_song+1) % len(songs_streams)
         k2.play_audio_stream(songs_streams[active_song])
+    }
+
+    // update all sfx
+    all_sfx_playing_count: int
+    for streams_by_sfx in sfx_streams {
+        for streams in streams_by_sfx {
+            for s in streams {
+                k2.update_audio_stream(s)
+                if k2.is_audio_stream_playing(s) {
+                    all_sfx_playing_count += 1
+                }
+            }
+        }
+    }
+
+    // play new sfx
+    defer sfx_to_play = {}
+    for to_play, kind in sfx_to_play {
+
+        cfg := sfx_config[kind]
+        streams_by_sfx := sfx_streams[kind]
+        assert(len(streams_by_sfx) > 0)
+
+        sfx_playing_count: int
+        for streams in streams_by_sfx {
+            for s in streams {
+                k2.update_audio_stream(s)
+                if k2.is_audio_stream_playing(s) {
+                    sfx_playing_count += 1
+                }
+            }
+        }
+
+        for _ in 0..<to_play {
+            if all_sfx_playing_count >= 20 do break
+            if sfx_playing_count >= 10 do break
+
+            sfx_idx := rand.int_max(len(streams_by_sfx))
+            streams := &streams_by_sfx[sfx_idx]
+
+            stream: k2.Audio_Stream
+            get_stream: {
+                for s in streams {
+                    if !k2.is_audio_stream_playing(s) {
+                        // reuse finished stream
+                        stream = s
+                        break get_stream
+                    }
+                }
+                // add new stream for this sfx
+                stream = k2.load_audio_stream_from_bytes(sfx_bytes[kind][sfx_idx])
+                append(streams, stream)
+            }
+
+            k2.set_audio_stream_pitch(stream, 1 + rand.float32_range(-cfg.pitch_var, cfg.pitch_var))
+            k2.set_audio_stream_volume(stream, cfg.volume + rand.float32_range(-0.05, 0.05))
+            k2.play_audio_stream(stream)
+            all_sfx_playing_count += 1
+            sfx_playing_count += 1
+        }
     }
 }
 

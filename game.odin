@@ -640,6 +640,7 @@ update_click :: proc () -> (ok: bool) {
                 // attack opposite side
                 selected_comp.target = compi
                 selected_company = nil // disselect after action
+                play_sfx(.Thud_Impact)
             }
         }
     }
@@ -648,6 +649,7 @@ update_click :: proc () -> (ok: bool) {
 
         company_get(selected).target = cell_idx
         selected_company = nil // disselect after action
+        play_sfx(.Thud_Impact)
     }
 
     return true
@@ -678,8 +680,18 @@ troop_attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
     dmg := tconfig.dmg_static + tconfig.dmg_move * la.length(troop.movement.velocity)
     dmg /= econfig.armor
 
+    if econfig.armor > 1 {
+        play_sfx(.Shield_Impact)
+    } else {
+        play_sfx(.Sword_Slash)
+    }
+
     enemy.combat.in_fight += 0.8
-    enemy.combat.dmg_taken = min(enemy.combat.dmg_taken + dmg, 1)
+    new_dmg := min(enemy.combat.dmg_taken + dmg, 1)
+    if enemy.combat.dmg_taken < 1 && new_dmg >= 1 {
+        play_sfx(.Thud_Impact)
+    }
+    enemy.combat.dmg_taken = new_dmg
     troop.combat.in_fight += 1
 
     return true
@@ -822,6 +834,13 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
         if troop_is_dead(troopi) do continue
 
+        if la.length(troop.movement.velocity) > 0.0005 {
+            switch troop_company(troopi).kind {
+            case .Infantry, .Heavy, .Archers: play_sfx(.Infantry_Run)
+            case .Riders:                     play_sfx(.Horse_Run)
+            }
+        }
+
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
 
@@ -864,6 +883,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
                 end   = target_celli,
                 speed = speed,
             })
+            play_sfx(.Arrow_Swish)
 
             troop_apply_force(troop, troop_cell_idx, dt)
 
@@ -892,12 +912,10 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
            (time_to_update || troop.movement.prefer == .Target) {
             // try moving towards the target directly
 
-            // TODO: this is not really next cell—need to check with an intention vector
             next := troop_coord + la.sign(target_coord-troop_coord)
             next_idx  := cell_idx(next)
             next_cell := cell_get(next_idx)
             if next_cell.troop != nil {
-                // troop.movement.prefer = .Path
                 break direct
             }
 
@@ -1007,7 +1025,12 @@ update_arrows :: proc (dt: f32) -> (ok: bool) {
 			if troop_is_dead(pos_troop.info.si) do break check_hit
 
 			pos_troop_config := troop_config(pos_troop.info.si)
+			was_alive := pos_troop.combat.dmg_taken < 1
 			pos_troop.combat.dmg_taken += 1 / pos_troop_config.armor
+			play_sfx(.Arrow_Impact)
+			if was_alive && pos_troop.combat.dmg_taken >= 1 {
+				play_sfx(.Thud_Impact)
+			}
             do_remove_after = true
 		}
 
