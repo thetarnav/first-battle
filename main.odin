@@ -51,12 +51,12 @@ step :: proc () -> bool {
 
     k2.update() or_return
     frame(capped_dt) or_return
+    audio_frame(capped_dt)
 
     fps := 1000.0/dt
     k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
 
     k2.present()
-    audio_frame()
 
     free_all(context.temp_allocator)
 

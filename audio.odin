@@ -23,14 +23,14 @@ SFX_Config :: struct {
 SFX_GLOBAL_CAP :: 8
 
 sfx_config := [Sound_Effect_Kind]SFX_Config{
-    .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=0.08},
-    .Sword_Impact  = {volume=0.55, pitch_var=0.15, cooldown=0.08},
-    .Arrow_Swish   = {volume=0.35, pitch_var=0.2,  cooldown=0.05},
-    .Arrow_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=0.08},
-    .Shield_Impact = {volume=0.5,  pitch_var=0.1,  cooldown=0.08},
-    .Thud_Impact   = {volume=0.65, pitch_var=0.1,  cooldown=0.1},
-    .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0.3},
-    .Horse_Run     = {volume=0.3,  pitch_var=0.05, cooldown=0.4},
+    .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=100},
+    .Sword_Impact  = {volume=0.55, pitch_var=0.15, cooldown=100},
+    .Arrow_Swish   = {volume=0.35, pitch_var=0.2,  cooldown=80},
+    .Arrow_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100},
+    .Shield_Impact = {volume=0.5,  pitch_var=0.1,  cooldown=100},
+    .Thud_Impact   = {volume=0.65, pitch_var=0.1,  cooldown=200},
+    .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0},
+    .Horse_Run     = {volume=0.3,  pitch_var=0.05, cooldown=200},
 }
 
 songs_bytes := [][]byte{
@@ -71,7 +71,11 @@ sfx_bytes := [Sound_Effect_Kind][][]byte{
     },
 }
 
-sfx_streams: [Sound_Effect_Kind][][dynamic]k2.Audio_Stream
+SFX_Stream :: struct {
+    stream:   k2.Audio_Stream,
+    cooldown: f32,
+}
+sfx_streams: [Sound_Effect_Kind][][dynamic]SFX_Stream
 sfx_to_play: [Sound_Effect_Kind]int
 
 songs_streams: []k2.Audio_Stream
@@ -98,7 +102,7 @@ audio_init :: proc () {
     }
 }
 
-audio_frame :: proc () {
+audio_frame :: proc (dt: f32) {
     if g_mute do return
 
     // update music songs
@@ -113,10 +117,12 @@ audio_frame :: proc () {
     all_sfx_playing_count: int
     for streams_by_sfx in sfx_streams {
         for streams in streams_by_sfx {
-            for s in streams {
-                k2.update_audio_stream(s)
-                if k2.is_audio_stream_playing(s) {
+            for &s in streams {
+                k2.update_audio_stream(s.stream)
+                if k2.is_audio_stream_playing(s.stream) {
                     all_sfx_playing_count += 1
+                } else {
+                    s.cooldown += dt
                 }
             }
         }
@@ -133,39 +139,40 @@ audio_frame :: proc () {
         sfx_playing_count: int
         for streams in streams_by_sfx {
             for s in streams {
-                k2.update_audio_stream(s)
-                if k2.is_audio_stream_playing(s) {
+                if k2.is_audio_stream_playing(s.stream) || s.cooldown < sfx_config[kind].cooldown {
                     sfx_playing_count += 1
                 }
             }
         }
 
         for _ in 0..<to_play {
-            if all_sfx_playing_count >= 20 do break
-            if sfx_playing_count >= 10 do break
+            if all_sfx_playing_count >= 24 do break
+            if sfx_playing_count >= 6 do break
 
             sfx_idx := rand.int_max(len(streams_by_sfx))
             streams := &streams_by_sfx[sfx_idx]
 
-            stream: k2.Audio_Stream
+            stream: ^SFX_Stream
             get_stream: {
-                for s in streams {
-                    if !k2.is_audio_stream_playing(s) {
+                for &s in streams {
+                    if !k2.is_audio_stream_playing(s.stream) {
                         // reuse finished stream
-                        stream = s
+                        stream = &s
                         break get_stream
                     }
                 }
                 // add new stream for this sfx
-                stream = k2.load_audio_stream_from_bytes(sfx_bytes[kind][sfx_idx])
-                append(streams, stream)
+                append_nothing(streams)
+                stream = &streams[len(streams)-1]
+                stream.stream = k2.load_audio_stream_from_bytes(sfx_bytes[kind][sfx_idx])
             }
 
-            k2.set_audio_stream_pitch(stream, 1 + rand.float32_range(-cfg.pitch_var, cfg.pitch_var))
-            k2.set_audio_stream_volume(stream, cfg.volume + rand.float32_range(-0.05, 0.05))
-            k2.play_audio_stream(stream)
+            k2.set_audio_stream_pitch(stream.stream, 1 + rand.float32_range(-cfg.pitch_var, cfg.pitch_var))
+            k2.set_audio_stream_volume(stream.stream, cfg.volume + rand.float32_range(-0.05, 0.05))
+            k2.play_audio_stream(stream.stream)
             all_sfx_playing_count += 1
             sfx_playing_count += 1
+            stream.cooldown = 0
         }
     }
 }
