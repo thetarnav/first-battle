@@ -2,10 +2,55 @@ package first_battle
 
 import k2 "./karl2d"
 
+Sound_Effect_Kind :: enum {
+    Sword_Slash,
+    Sword_Impact,
+    Arrow_Swish,
+    Arrow_Impact,
+    Shield_Impact,
+    Thud_Impact,
+    Infantry_Run,
+    Horse_Run,
+}
+
 songs_bytes := [][]byte{
     #load("audio/montogoronto-dark-orchestral-battle-tension-395613.ogg"),
     #load("audio/rolandomat-epic-battle-song-182915.ogg"),
 }
+
+sound_effect_bytes := [Sound_Effect_Kind][][]byte{
+    .Sword_Slash = {
+        #load("audio/54427377-sword-slash-476148.ogg"),
+        #load("audio/dragon-studio-sword-slice-393847.ogg"),
+        #load("audio/freesound_community-sword-sound-2-36274.ogg"),
+        #load("audio/musicholder-sword-sound-260274.ogg"),
+    },
+    .Sword_Impact = {
+        #load("audio/dragon-studio-sword-fight-393849.ogg"),
+        #load("audio/universfield-sword-blade-slicing-flesh-352708.ogg"),
+    },
+    .Arrow_Swish = {
+        #load("audio/djartmusic-arrow-swish_03-306040.ogg"),
+    },
+    .Arrow_Impact = {
+        #load("audio/dennish18-arrow-body-impact-146419.ogg"),
+        #load("audio/dennish18-arrow-wood-impact-146418.ogg"),
+    },
+    .Thud_Impact = {
+        #load("audio/virtual_vibes-thud-impact-sound-sfx-379990.ogg"),
+    },
+    .Shield_Impact = {
+        #load("audio/yodguard-shield_impact-1-382410.ogg"),
+        #load("audio/yodguard-shield_impact-5-382415.ogg"),
+    },
+    .Infantry_Run = {
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486.ogg"),
+    },
+    .Horse_Run = {
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257.ogg"),
+    },
+}
+
 songs_streams: []k2.Audio_Stream
 active_song: int
 
