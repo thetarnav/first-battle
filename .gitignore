@@ -1,13 +1,4 @@
-# Files with no extensions (likely a binary)
-*
-!/**/
-!*.*
-
-*.bin
-*.[oa]
-
 bin/
 build/
-
 ols.json
 
