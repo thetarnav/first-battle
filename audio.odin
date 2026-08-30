@@ -24,11 +24,11 @@ SFX_GLOBAL_CAP :: 8
 
 sfx_config := [Sound_Effect_Kind]SFX_Config{
     .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=100},
-    .Sword_Impact  = {volume=0.55, pitch_var=0.15, cooldown=100},
-    .Arrow_Swish   = {volume=0.35, pitch_var=0.2,  cooldown=80},
-    .Arrow_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100},
-    .Shield_Impact = {volume=0.5,  pitch_var=0.1,  cooldown=100},
-    .Thud_Impact   = {volume=0.65, pitch_var=0.1,  cooldown=200},
+    .Sword_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100},
+    .Arrow_Swish   = {volume=0.3,  pitch_var=0.2,  cooldown=80},
+    .Arrow_Impact  = {volume=0.24, pitch_var=0.2,  cooldown=200},
+    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=100},
+    .Thud_Impact   = {volume=0.4,  pitch_var=0.15, cooldown=200},
     .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0},
     .Horse_Run     = {volume=0.3,  pitch_var=0.05, cooldown=200},
 }
