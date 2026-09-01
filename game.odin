@@ -197,6 +197,17 @@ get_board_rect :: proc () -> (rect: Rect) {
     return
 }
 
+check_winner :: proc () -> Maybe(Army_Side) {
+    armies_loop: for army in armies {
+        for compi in army.units {
+            comp := company_get(compi)
+            if len(comp.alive_units) > 0 do continue armies_loop
+        }
+        return side_opposite(army.side)
+    }
+    return nil
+}
+
 board_coord_from_pos :: proc (pos: Vec2) -> (coord: Coord, ok: bool) #optional_ok {
     return Coord(pos), grid.inside(board, Coord(pos))
 }
@@ -1202,18 +1213,27 @@ frame :: proc (dt: f32) -> bool {
         update_automatic()
         update_troops(dt)
         update_arrows(dt)
+
+        winner := check_winner()
+        if winner != nil {
+            ui_view = .End
+        }
     }
 
-    if k2.key_went_down(.Q) {
+    if k2.key_went_down(.Q) { // Quit
         return false
     }
-    if k2.key_went_down(.R) {
+    if k2.key_went_down(.R) { // Restart
         game_initalized = false
     }
-    if k2.key_went_down(.Escape) {
-        ui_view = .Main_Menu
-    }
 
+    if k2.key_went_down(.Escape) { // Esc to main menu
+        switch ui_view {
+        case .Main_Menu: ui_view = .Game
+        case .Game:      ui_view = .Main_Menu
+        case .End:
+        }
+    }
 
     k2.clear(COLOR_BG)
 

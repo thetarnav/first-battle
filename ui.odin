@@ -194,14 +194,22 @@ draw_end_ui :: proc () {
     play_rect := rect_extend(play_text_rect, {5, 3})
 
     if point_in_rect(ui_mouse, play_text_rect) && k2.mouse_button_went_down(.Left) {
-        ui_view = .Game
+        ui_view = .Main_Menu
+        game_initalized = false
     }
 
     draw_border(play_rect)
     draw_texture(tex_atlas, play_text_rect, play_tex_rect)
 
-    // Title
-    win_tex_rect := atlas_rects[.Win_Enemy]
+    // Winner image
+    winner := check_winner()
+
+    win_tex_rect: Rect
+    switch winner.? {
+    case .Player: win_tex_rect = atlas_rects[.Win_Player]
+    case .Enemy:  win_tex_rect = atlas_rects[.Win_Enemy]
+    }
+
     win_rect: Rect = {
         {ui_center.x - win_tex_rect.size.x/2, ui_center.y - win_tex_rect.size.y},
         win_tex_rect.size,
