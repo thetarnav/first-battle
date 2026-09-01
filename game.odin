@@ -143,7 +143,8 @@ army_colors := [Army_Side]Army_Colors{
     .Enemy  = {light=COLOR_ENEMY_LIGHT,  dark=COLOR_ENEMY_DARK},
 }
 
-state_arena: runtime.Arena
+state_arena:     runtime.Arena
+state_allocator: runtime.Allocator
 
 armies: [Army_Side]Army = {}
 army_player := &armies[.Player]
@@ -471,7 +472,8 @@ game_init :: proc () {
         runtime.arena_free_all(&state_arena)
     }
 
-    context.allocator = runtime.arena_allocator(&state_arena)
+    state_allocator = runtime.arena_allocator(&state_arena)
+    context.allocator = state_allocator
 
     update_frame_globals()
 
@@ -1206,6 +1208,7 @@ frame :: proc (dt: f32) -> bool {
     update_frame_globals()
 
     game_init()
+    context.allocator = state_allocator // state_arena
 
     if ui_view == .Game {
         update_companies()
