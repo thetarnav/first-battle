@@ -556,43 +556,34 @@ update_hover :: proc () -> (ok: bool) {
 update_companies :: proc () -> (ok: bool) {
 
     // update alive units array and average company position
-    for army in armies {
-        for compi in army.units {
-            comp := company_get(compi)
+    for &comp in companies {
 
-            alive_units := make([dynamic]Troop_Idx, 0, len(comp.units), allocator=context.temp_allocator)
+        alive_units := make([dynamic]Troop_Idx, 0, len(comp.units), allocator=context.temp_allocator)
+        sum_pos: Vec2
 
-            sum_pos: Vec2
+        for uidx in comp.units {
+            ucell := troop_cell(uidx)
 
-            for uidx in comp.units {
-                ucell := troop_cell(uidx)
-
-                if troop_is_alive(uidx) {
-                    append(&alive_units, uidx)
-                    sum_pos += troop_get(uidx).pos
-                } else if ucell.troop == uidx {
-                    ucell.troop  = nil
-                    ucell.corpse = true
-                }
+            if troop_is_alive(uidx) {
+                append(&alive_units, uidx)
+                sum_pos += troop_get(uidx).pos
+            } else if ucell.troop == uidx {
+                ucell.troop  = nil
+                ucell.corpse = true
             }
-
-            shrink(&alive_units)
-            comp.alive_units = alive_units[:]
-            comp.avg_pos     = sum_pos/f32(len(alive_units))
         }
+
+        shrink(&alive_units)
+        comp.alive_units = alive_units[:]
+        comp.avg_pos     = sum_pos/f32(len(alive_units))
     }
 
     // don't target dead company
-    for army in armies {
-        for compi in army.units {
-            comp := company_get(compi)
-
-            if target_idx, has_target := comp.target.(Company_Idx); has_target {
-                target_company := company_get(target_idx)
-                if len(target_company.alive_units) == 0 {
-                    comp.target = cell_idx_from_pos(comp.avg_pos)
-                }
-            }
+    for &comp in companies {
+        target_idx := comp.target.(Company_Idx) or_continue
+        target_company := company_get(target_idx)
+        if len(target_company.alive_units) == 0 {
+            comp.target = cell_idx_from_pos(comp.avg_pos)
         }
     }
 
@@ -1147,28 +1138,23 @@ draw_arrows :: proc () {
 }
 
 draw_company_targets :: proc () {
-    for army in armies {
-        for compi in army.units {
-            comp := company_get(compi)
+    for comp in companies do if len(comp.alive_units) > 0 {
 
-            if len(comp.alive_units) == 0 do continue
+        start := comp.avg_pos
+        end   := comp.avg_pos
 
-            start := comp.avg_pos
-            end   := comp.avg_pos
+        switch t in comp.target {
+        case Cell_Idx:
+            end = cell_center(t)
+        case Company_Idx:
+            tcomp := company_get(t)
+            end = tcomp.avg_pos
+        }
 
-            switch t in comp.target {
-            case Cell_Idx:
-                end = cell_center(t)
-            case Company_Idx:
-                tcomp := company_get(t)
-                end = tcomp.avg_pos
-            }
-
-            if start == end {
-                draw_cross(start, k2.YELLOW)
-            } else {
-                k2.draw_line(start, end, 0.5, k2.YELLOW)
-            }
+        if start == end {
+            draw_cross(start, k2.YELLOW)
+        } else {
+            k2.draw_line(start, end, 0.5, k2.YELLOW)
         }
     }
 }
