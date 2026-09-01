@@ -461,6 +461,7 @@ game_init :: proc () {
     // clear previous state
     armies    = {}
     companies = {}
+    arrows    = {}
 
     // setup state arena
     if state_arena == {} {
