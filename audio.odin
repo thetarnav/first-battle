@@ -24,11 +24,11 @@ SFX_Config :: struct {
 SFX_GLOBAL_CAP :: 12
 
 sfx_config := [SFX_Kind]SFX_Config{
-    .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=100, cap=3},
-    .Sword_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100, cap=3},
-    .Arrow_Swish   = {volume=0.3,  pitch_var=0.2,  cooldown=80,  cap=4},
+    .Sword_Slash   = {volume=0.42, pitch_var=0.15, cooldown=100, cap=4},
+    .Sword_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100, cap=4},
+    .Arrow_Swish   = {volume=0.3,  pitch_var=0.2,  cooldown=80,  cap=5},
     .Arrow_Impact  = {volume=0.24, pitch_var=0.2,  cooldown=200, cap=3},
-    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=100, cap=2},
+    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=150, cap=2},
     .Thud_Impact   = {volume=0.4,  pitch_var=0.15, cooldown=200, cap=3},
     .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0,   cap=2},
     .Horse_Run     = {volume=0.4,  pitch_var=0.05, cooldown=200, cap=2},
@@ -45,10 +45,14 @@ sfx_bytes := [SFX_Kind][][]byte{
         #load("audio/dragon-studio-sword-slice-393847.ogg"),
         #load("audio/freesound_community-sword-sound-2-36274.ogg"),
         #load("audio/musicholder-sword-sound-260274.ogg"),
+        #load("audio/universfield-sword-blade-slicing-flesh-352708.ogg"),
     },
     .Sword_Impact = {
-        #load("audio/dragon-studio-sword-fight-393849.ogg"),
-        #load("audio/universfield-sword-blade-slicing-flesh-352708.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-1.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-2.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-3.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-4.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-5.ogg"),
     },
     .Arrow_Swish = {
         #load("audio/djartmusic-arrow-swish_03-306040.ogg"),
