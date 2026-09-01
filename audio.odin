@@ -3,7 +3,7 @@ package first_battle
 import k2 "./karl2d"
 import "core:math/rand"
 
-Sound_Effect_Kind :: enum {
+SFX_Kind :: enum {
     Sword_Slash,
     Sword_Impact,
     Arrow_Swish,
@@ -23,15 +23,15 @@ SFX_Config :: struct {
 
 SFX_GLOBAL_CAP :: 12
 
-sfx_config := [Sound_Effect_Kind]SFX_Config{
+sfx_config := [SFX_Kind]SFX_Config{
     .Sword_Slash   = {volume=0.45, pitch_var=0.1,  cooldown=100, cap=3},
     .Sword_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100, cap=3},
     .Arrow_Swish   = {volume=0.3,  pitch_var=0.2,  cooldown=80,  cap=4},
     .Arrow_Impact  = {volume=0.24, pitch_var=0.2,  cooldown=200, cap=3},
-    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=100, cap=3},
+    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=100, cap=2},
     .Thud_Impact   = {volume=0.4,  pitch_var=0.15, cooldown=200, cap=3},
     .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0,   cap=2},
-    .Horse_Run     = {volume=0.3,  pitch_var=0.05, cooldown=200, cap=2},
+    .Horse_Run     = {volume=0.4,  pitch_var=0.05, cooldown=200, cap=2},
 }
 
 songs_bytes := [][]byte{
@@ -39,7 +39,7 @@ songs_bytes := [][]byte{
     #load("audio/rolandomat-epic-battle-song-182915.ogg"),
 }
 
-sfx_bytes := [Sound_Effect_Kind][][]byte{
+sfx_bytes := [SFX_Kind][][]byte{
     .Sword_Slash = {
         #load("audio/54427377-sword-slash-476148.ogg"),
         #load("audio/dragon-studio-sword-slice-393847.ogg"),
@@ -76,15 +76,15 @@ SFX_Stream :: struct {
     stream:   k2.Audio_Stream,
     cooldown: f32,
 }
-sfx_streams: [Sound_Effect_Kind][][dynamic]SFX_Stream
-sfx_to_play: [Sound_Effect_Kind]bool
+sfx_streams: [SFX_Kind][][dynamic]SFX_Stream
+sfx_to_play: [SFX_Kind]bool
 
 songs_streams: []k2.Audio_Stream
 active_song: int
 
 g_mute: bool
 
-play_sfx :: proc (kind: Sound_Effect_Kind) {
+play_sfx :: proc (kind: SFX_Kind) {
     sfx_to_play[kind] = true
 }
 
@@ -100,6 +100,24 @@ audio_init :: proc () {
         for &streams in streams_by_sfx {
             streams = make(type_of(streams))
         }
+    }
+}
+
+get_sfx_playing_by_kind :: proc (playing: ^[SFX_Kind]int) {
+
+    for kind_streams, kind in sfx_streams {
+
+        count: int
+        for streams in kind_streams {
+            for s in streams {
+                if k2.is_audio_stream_playing(s.stream) ||
+                   s.cooldown < sfx_config[kind].cooldown {
+                    count += 1
+                }
+            }
+        }
+
+        playing[kind] = count
     }
 }
 
@@ -129,6 +147,10 @@ audio_frame :: proc (dt: f32) {
         }
     }
 
+
+    sfx_playing_count: [SFX_Kind]int
+    get_sfx_playing_by_kind(&sfx_playing_count)
+
     // play new sfx
     defer sfx_to_play = {}
     for kind_requested, kind in sfx_to_play do if kind_requested {
@@ -137,18 +159,8 @@ audio_frame :: proc (dt: f32) {
         kind_streams := sfx_streams[kind]
         assert(len(kind_streams) > 0)
 
-        sfx_playing_count_kind: int
-        for streams in kind_streams {
-            for s in streams {
-                if k2.is_audio_stream_playing(s.stream) ||
-                   s.cooldown < sfx_config[kind].cooldown {
-                    sfx_playing_count_kind += 1
-                }
-            }
-        }
-
-        if sfx_playing_count_all  >= SFX_GLOBAL_CAP do break
-        if sfx_playing_count_kind >= kind_cfg.cap do break
+        if sfx_playing_count_all   >= SFX_GLOBAL_CAP do break
+        if sfx_playing_count[kind] >= kind_cfg.cap do break
 
         sfx_idx := rand.int_max(len(kind_streams))
         streams := &kind_streams[sfx_idx]
@@ -169,10 +181,9 @@ audio_frame :: proc (dt: f32) {
         }
 
         k2.set_audio_stream_pitch(stream.stream, 1 + rand.float32_range(-kind_cfg.pitch_var, kind_cfg.pitch_var))
-        k2.set_audio_stream_volume(stream.stream, kind_cfg.volume * rand.float32_range(-0.2, 0.2))
+        k2.set_audio_stream_volume(stream.stream, kind_cfg.volume * (1 + rand.float32_range(-0.2, 0.2)))
         k2.play_audio_stream(stream.stream)
         sfx_playing_count_all += 1
-        sfx_playing_count_kind += 1
         stream.cooldown = 0
     }
 }

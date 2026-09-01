@@ -54,7 +54,18 @@ step :: proc () -> bool {
     audio_frame(capped_dt)
 
     fps := 1000.0/dt
-    k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.GREEN)
+    k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.WHITE)
+
+    {
+        y: f32
+        sfx_playing_count: [SFX_Kind]int
+        get_sfx_playing_by_kind(&sfx_playing_count)
+        for count, kind in sfx_playing_count {
+            if count == 0 do continue
+            k2.draw_text(fmt.tprintf("%v = %v", kind, count), {20, 50} + {0, y}, 26, k2.WHITE)
+            y += 26
+        }
+    }
 
     k2.present()
 
