@@ -149,6 +149,8 @@ armies: [Army_Side]Army = {}
 army_player := &armies[.Player]
 army_enemy  := &armies[.Enemy]
 
+armies_ratio: f32 = 0.5 // player army size / enemy army size
+
 automatic := [Army_Side]bool{
     .Player = false,
     .Enemy  = true,
@@ -165,11 +167,11 @@ selected_company: Maybe(Company_Idx)
 board: grid.Grid(Cell)
 
 // updated every fame
-window_size: Vec2
-board_rect:  Rect // board rectangle on the screen
-camera:      k2.Camera
-mouse_pos:   Vec2
-mouse_world: Vec2
+window_size:  Vec2
+board_rect:   Rect // board rectangle on the screen
+mouse_pos:    Vec2
+mouse_world:  Vec2
+camera_board: k2.Camera
 
 tex_atlas: k2.Texture
 
@@ -484,7 +486,7 @@ game_init :: proc () {
             comp.idx    = compi
             comp.kind   = initial.kind
 
-            units_count_ratio := slider_value if side == .Player else 1-slider_value
+            units_count_ratio := armies_ratio if side == .Player else 1-armies_ratio
             units_count := int(f32(initial.count) / (units_count_ratio*2))
             comp.units = make([]Troop_Idx, units_count)
 
@@ -521,11 +523,11 @@ game_init :: proc () {
 }
 
 update_frame_globals :: proc () {
-    window_size = k2.get_screen_size()
-    board_rect  = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
-    camera      = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
-    mouse_pos   = k2.get_mouse_position()
-    mouse_world = k2.screen_to_world(mouse_pos, camera)
+    window_size  = k2.get_screen_size()
+    board_rect   = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
+    camera_board = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
+    mouse_pos    = k2.get_mouse_position()
+    mouse_world  = k2.screen_to_world(mouse_pos, camera_board)
 }
 
 update_hover :: proc () -> (ok: bool) {
@@ -1201,18 +1203,13 @@ draw_selected_company :: proc () {
     }
 }
 
-draw_ui :: proc () {
-    draw_cross(mouse_pos, k2.GREEN)
-    draw_cross(window_size/2, k2.GRAY)
-}
-
 frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
 
     game_init()
 
-    if !should_display_menu {
+    if ui_view == .Game {
         update_companies()
         update_hover()
         update_click()
@@ -1228,13 +1225,13 @@ frame :: proc (dt: f32) -> bool {
         game_initalized = false
     }
     if k2.key_went_down(.Escape) {
-        should_display_menu = true
+        ui_view = .Main_Menu
     }
 
 
     k2.clear(COLOR_BG)
 
-    k2.set_camera(camera)
+    k2.set_camera(camera_board)
 
     draw_board()
     draw_troop_shadows()
@@ -1246,9 +1243,7 @@ frame :: proc (dt: f32) -> bool {
 
     k2.set_camera(nil)
 
-    draw_ui()
-
-    menu_frame()
+    ui_frame()
 
     return true
 }
