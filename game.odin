@@ -1210,8 +1210,7 @@ draw_selected_company :: proc () {
 frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
-    grain_update()
-    glow_update()
+    post_update()
 
     game_init()
     context.allocator = state_allocator // state_arena

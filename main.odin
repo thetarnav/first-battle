@@ -15,8 +15,7 @@ init :: proc () {
         window_mode = .Windowed_Resizable,
     })
     audio_init()
-    grain_init()
-    glow_init()
+    post_init()
 }
 
 MAX_FPS :: 60.0
