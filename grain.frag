@@ -29,14 +29,7 @@ void main() {
     float noise = hash21(pixel, time);
 
     // Remap [0, 1] -> [-1, 1]
-    noise = noise * 2.0 - 1.0;
-
-    // Mostly static, with a very subtle temporal component
-    float temporal = hash21(pixel, time);
-
-    noise = mix(noise,
-                temporal * 2.0 - 1.0,
-                0.08);
+    noise = noise * 2.0 - 1.0; 
 
     // Multiplicative grain
     color.rgb *= 1.0 + noise * strength;
