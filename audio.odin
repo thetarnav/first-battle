@@ -1,7 +1,8 @@
 package first_battle
 
-import k2 "./karl2d"
 import "core:math/rand"
+
+import k2 "./karl2d"
 
 SFX_Kind :: enum {
     Sword_Slash,
@@ -21,7 +22,7 @@ SFX_Config :: struct {
     cap:       int,
 }
 
-SFX_GLOBAL_CAP :: 12
+SFX_GLOBAL_CAP :: 32
 
 sfx_config := [SFX_Kind]SFX_Config{
     .Sword_Slash   = {volume=0.42, pitch_var=0.15, cooldown=100, cap=4},
@@ -30,7 +31,7 @@ sfx_config := [SFX_Kind]SFX_Config{
     .Arrow_Impact  = {volume=0.24, pitch_var=0.2,  cooldown=200, cap=3},
     .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=150, cap=2},
     .Thud_Impact   = {volume=0.4,  pitch_var=0.15, cooldown=200, cap=3},
-    .Infantry_Run  = {volume=0.25, pitch_var=0.05, cooldown=0,   cap=2},
+    .Infantry_Run  = {volume=0.5,  pitch_var=0.25, cooldown=60,  cap=20},
     .Horse_Run     = {volume=0.4,  pitch_var=0.05, cooldown=200, cap=2},
 }
 
@@ -69,19 +70,31 @@ sfx_bytes := [SFX_Kind][][]byte{
         #load("audio/yodguard-shield_impact-5-382415.ogg"),
     },
     .Infantry_Run = {
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-1.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-2.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-3.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-4.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-5.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-6.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-7.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-1.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-2.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-3.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-4.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-5.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-6.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-7.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-8.ogg"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-9.ogg"),
     },
     .Horse_Run = {
         #load("audio/pwlpl-horses-galloping-sound-effect-359257.ogg"),
     },
 }
 
-SFX_Stream :: struct {
-    stream:   k2.Audio_Stream,
-    cooldown: f32,
-}
-sfx_streams: [SFX_Kind][][dynamic]SFX_Stream
-sfx_to_play: [SFX_Kind]bool
+sfx_streams:   [SFX_Kind][]k2.Audio_Stream
+sfx_to_play:   [SFX_Kind]bool
+sfx_cooldowns: [SFX_Kind]f32
 
 songs_streams: []k2.Audio_Stream
 active_song: int
@@ -98,11 +111,11 @@ audio_init :: proc () {
     for bytes, i in songs_bytes {
         songs_streams[i] = k2.load_audio_stream_from_bytes(bytes)
     }
-    // create arrays for sfx
-    for &streams_by_sfx, kind in sfx_streams {
-        streams_by_sfx = make(type_of(streams_by_sfx), len(sfx_bytes[kind]))
-        for &streams in streams_by_sfx {
-            streams = make(type_of(streams))
+    // create streams for all sfx (twice for each sfx so they can be played at the same time)
+    for &kind_streams, kind in sfx_streams {
+        kind_streams = make([]k2.Audio_Stream, len(sfx_bytes[kind]) * 2)
+        for &s, i in kind_streams {
+            s = k2.load_audio_stream_from_bytes(sfx_bytes[kind][i / 2])
         }
     }
 }
@@ -112,12 +125,9 @@ get_sfx_playing_by_kind :: proc (playing: ^[SFX_Kind]int) {
     for kind_streams, kind in sfx_streams {
 
         count: int
-        for streams in kind_streams {
-            for s in streams {
-                if k2.is_audio_stream_playing(s.stream) ||
-                   s.cooldown < sfx_config[kind].cooldown {
-                    count += 1
-                }
+        for stream in kind_streams {
+            if k2.is_audio_stream_playing(stream) {
+                count += 1
             }
         }
 
@@ -127,6 +137,11 @@ get_sfx_playing_by_kind :: proc (playing: ^[SFX_Kind]int) {
 
 audio_frame :: proc (dt: f32) {
     if g_mute do return
+
+    // reduce cooldoowns
+    for &c in sfx_cooldowns {
+        c -= dt
+    }
 
     // update music songs
     k2.update_audio_stream(songs_streams[active_song])
@@ -139,14 +154,12 @@ audio_frame :: proc (dt: f32) {
     // update all sfx
     sfx_playing_count_all: int
     for streams_by_sfx in sfx_streams {
-        for streams in streams_by_sfx {
-            for &s in streams {
-                k2.update_audio_stream(s.stream)
-                if k2.is_audio_stream_playing(s.stream) {
-                    sfx_playing_count_all += 1
-                } else {
-                    s.cooldown += dt
-                }
+        for stream in streams_by_sfx {
+            k2.update_audio_stream(stream)
+            if k2.is_audio_stream_playing(stream) {
+                sfx_playing_count_all += 1
+            } else {
+                k2.pause_audio_stream(stream)
             }
         }
     }
@@ -163,32 +176,24 @@ audio_frame :: proc (dt: f32) {
         kind_streams := sfx_streams[kind]
         assert(len(kind_streams) > 0)
 
+        if sfx_cooldowns[kind] > 0 do break
         if sfx_playing_count_all   >= SFX_GLOBAL_CAP do break
         if sfx_playing_count[kind] >= kind_cfg.cap do break
+        if sfx_playing_count[kind] >= len(kind_streams) do break
 
         sfx_idx := rand.int_max(len(kind_streams))
-        streams := &kind_streams[sfx_idx]
-
-        stream: ^SFX_Stream
-        get_stream: {
-            for &s in streams {
-                if !k2.is_audio_stream_playing(s.stream) {
-                    // reuse finished stream
-                    stream = &s
-                    break get_stream
-                }
-            }
-            // add new stream for this sfx
-            append_nothing(streams)
-            stream = &streams[len(streams)-1]
-            stream.stream = k2.load_audio_stream_from_bytes(sfx_bytes[kind][sfx_idx])
+        stream: k2.Audio_Stream
+        for {
+            stream = kind_streams[sfx_idx]
+            k2.is_audio_stream_playing(stream) or_break
+            sfx_idx = (sfx_idx+1) % len(kind_streams)
         }
 
-        k2.set_audio_stream_pitch(stream.stream, 1 + rand.float32_range(-kind_cfg.pitch_var, kind_cfg.pitch_var))
-        k2.set_audio_stream_volume(stream.stream, kind_cfg.volume * (1 + rand.float32_range(-0.2, 0.2)))
-        k2.play_audio_stream(stream.stream)
+        k2.set_audio_stream_pitch(stream, 1 + rand.float32_range(-kind_cfg.pitch_var, kind_cfg.pitch_var))
+        k2.set_audio_stream_volume(stream, kind_cfg.volume * (1 + rand.float32_range(-0.2, 0.2)))
+        k2.play_audio_stream(stream)
         sfx_playing_count_all += 1
-        stream.cooldown = 0
+        sfx_cooldowns[kind] = kind_cfg.cooldown
     }
 }
 
