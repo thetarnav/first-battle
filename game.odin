@@ -474,6 +474,7 @@ game_init :: proc () {
     armies    = {}
     companies = {}
     arrows    = {}
+    particles = {}
 
     // setup state arena
     if state_arena == {} {
