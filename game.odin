@@ -83,6 +83,12 @@ Troop_Idx :: distinct u16
 Troop_Arr :: #soa[dynamic]Troop
 Troop_Ptr :: #soa^Troop_Arr
 
+Cell :: struct {
+    troop:  Maybe(Troop_Idx),
+    corpse: bool,
+}
+Cell_Idx :: distinct u16
+
 Arrow :: struct {
     from:  Vec2,
     end:   Cell_Idx,
@@ -90,11 +96,13 @@ Arrow :: struct {
     speed: f32,
 }
 
-Cell :: struct {
-    troop:  Maybe(Troop_Idx),
-    corpse: bool,
+Particle :: struct {
+    kind:  enum {Dust},
+    pos:   Vec2,
+    rot:   f32,
+    life:  f32,
+    start: f64,
 }
-Cell_Idx :: distinct u16
 
 @rodata
 initial_army_units: []struct {kind: Unit_Kind, pos: Coord, count: int} = {
@@ -162,13 +170,15 @@ is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 troops:    Troop_Arr
 companies: [dynamic]Company
 arrows:    [dynamic]Arrow
+particles: [dynamic]Particle
 
-hovered_troop: Maybe(Troop_Idx)
+hovered_troop:    Maybe(Troop_Idx)
 selected_company: Maybe(Company_Idx)
 
 board: grid.Grid(Cell)
 
 // updated every fame
+frame_time:   f64
 window_size:  Vec2
 board_rect:   Rect // board rectangle on the screen
 mouse_pos:    Vec2
@@ -538,6 +548,7 @@ game_init :: proc () {
 }
 
 update_frame_globals :: proc () {
+    frame_time   = k2.get_time()*1000
     window_size  = k2.get_screen_size()
     board_rect   = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
     camera_board = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
@@ -844,13 +855,6 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
         if troop_is_dead(troopi) do continue
 
-        if la.length(troop.movement.velocity) > 0.0005 {
-            switch troop_company(troopi).kind {
-            case .Infantry, .Heavy, .Archers: play_sfx(.Infantry_Run)
-            case .Riders:                     play_sfx(.Horse_Run)
-            }
-        }
-
         troop_coord := board_coord_from_pos(troop.pos)
         troop_cell_idx := cell_idx(troop_coord)
 
@@ -860,10 +864,22 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         troop.movement.time_left -= dt
         time_to_update := troop.movement.time_left <= 0
         if time_to_update {
-            troop.movement.time_left = rand.float32_range(200, 600)
+            troop.movement.time_left = rand.float32_range(240, 700)
         }
 
         troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
+
+        velocity_length := la.length(troop.movement.velocity)
+        if velocity_length > 0.002 {
+            switch troop_company(troopi).kind {
+            case .Infantry, .Heavy, .Archers: play_sfx(.Infantry_Run)
+            case .Riders:                     play_sfx(.Horse_Run)
+            }
+
+            if time_to_update {
+                spawn_dust_cloud(troop.pos, velocity_length * troop_config.armor)
+            }
+        }
 
         // handle archers shooting before any movement
         shooting: if troop_comp.kind == .Archers && troop.shooting.time > 0 {
@@ -1004,52 +1020,80 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
 update_arrows :: proc (dt: f32) -> (ok: bool) {
 
-	#reverse for &arrow, i in arrows {
+    #reverse for &arrow, i in arrows {
 
-		end_pos := cell_center(arrow.end)
+        end_pos := cell_center(arrow.end)
         arrow.speed *= math.pow(ARROW_DAMPING, dt)
-		arrow.pos   += la.normalize(end_pos-arrow.from) * arrow.speed * dt
+        arrow.pos   += la.normalize(end_pos-arrow.from) * arrow.speed * dt
 
-		do_check_hit: bool
-		do_remove_after: bool
+        do_check_hit: bool
+        do_remove_after: bool
 
-		if cell_idx_from_pos(arrow.pos) == arrow.end || arrow.speed < ARROW_SPEED_MIN {
-			do_check_hit = true
-			do_remove_after = true
-		}
-
-		if arrow.speed < ARROW_SPEED_HIT {
-			do_check_hit = true
-		}
-
-		end_coord := cell_coord(arrow.end)
-		pos_coord, _ := board_coord_from_pos(arrow.pos)
-		coord_diff := la.abs(end_coord - pos_coord)
-		if coord_diff.x <= 1 && coord_diff.y <= 1 && Coord(arrow.from) != pos_coord {
-			do_check_hit = true
-		}
-
-		check_hit: if do_check_hit {
-			pos_celli := cell_idx(pos_coord) or_break check_hit
-			pos_troop := cell_troop(pos_celli) or_break check_hit
-			if troop_is_dead(pos_troop.info.si) do break check_hit
-
-			pos_troop_config := troop_config(pos_troop.info.si)
-			was_alive := pos_troop.combat.dmg_taken < 1
-			pos_troop.combat.dmg_taken += 1 / pos_troop_config.armor
-			play_sfx(.Arrow_Impact)
-			if was_alive && pos_troop.combat.dmg_taken >= 1 {
-				play_sfx(.Thud_Impact)
-			}
+        if cell_idx_from_pos(arrow.pos) == arrow.end || arrow.speed < ARROW_SPEED_MIN {
+            do_check_hit = true
             do_remove_after = true
-		}
+        }
 
-		if do_remove_after {
-			unordered_remove(&arrows, i)
-		}
-	}
+        if arrow.speed < ARROW_SPEED_HIT {
+            do_check_hit = true
+        }
 
-	return true
+        end_coord := cell_coord(arrow.end)
+        pos_coord, _ := board_coord_from_pos(arrow.pos)
+        coord_diff := la.abs(end_coord - pos_coord)
+        if coord_diff.x <= 1 && coord_diff.y <= 1 && Coord(arrow.from) != pos_coord {
+            do_check_hit = true
+        }
+
+        check_hit: if do_check_hit {
+            pos_celli := cell_idx(pos_coord) or_break check_hit
+            pos_troop := cell_troop(pos_celli) or_break check_hit
+            if troop_is_dead(pos_troop.info.si) do break check_hit
+
+                pos_troop_config := troop_config(pos_troop.info.si)
+                was_alive := pos_troop.combat.dmg_taken < 1
+                pos_troop.combat.dmg_taken += 1 / pos_troop_config.armor
+                play_sfx(.Arrow_Impact)
+                if was_alive && pos_troop.combat.dmg_taken >= 1 {
+                    play_sfx(.Thud_Impact)
+                }
+                do_remove_after = true
+        }
+
+        if do_remove_after {
+            unordered_remove(&arrows, i)
+        }
+    }
+
+    return true
+}
+
+update_particles :: proc (dt: f32) {
+    #reverse for &p, i in particles {
+
+        if frame_time - p.start >= f64(p.life) {
+            unordered_remove(&particles, i)
+            continue
+        }
+
+        r := rand.float32_laplace(0.002, 0.002)
+        p.pos.y += r * dt
+        p.pos.x += r * dt
+        p.rot   += r/10 * dt
+    }
+}
+
+spawn_dust_cloud :: proc (pos: Vec2, vel: f32) {
+    life := vel * 100_000
+    if life <= 1 do return
+    life += rand.float32_range(0, 1600)
+    append(&particles, Particle{
+        kind  = .Dust,
+        pos   = pos,
+        rot   = rand.float32(),
+        life  = life,
+        start = frame_time,
+    })
 }
 
 draw_board :: proc () {
@@ -1155,6 +1199,25 @@ draw_arrows :: proc () {
     }
 }
 
+pulse :: proc(t, peak: f32) -> f32 {
+	if t < peak {
+		return math.sin((t / peak) * (math.PI * 0.5))
+	}
+
+	return math.sin(((1 - t) / (1 - peak)) * (math.PI * 0.5))
+}
+
+draw_particles :: proc () {
+    size := fit_aspect_into_min(atlas_rects[.Dust_Cloud].size, 3)
+    for p in particles {
+        t := f32(frame_time - p.start) / p.life
+        alpha := u8(t * 200)
+        size := size
+        size *= pulse(t, 0.12)
+        draw_texture(tex_atlas, {p.pos-size/2, size}, atlas_rects[.Dust_Cloud], tint={255,255,255,alpha}, rot=p.rot)
+    }
+}
+
 draw_company_targets :: proc () {
     for comp in companies do if len(comp.alive_units) > 0 {
 
@@ -1221,6 +1284,7 @@ frame :: proc (dt: f32) -> bool {
         update_automatic()
         update_troops(dt)
         update_arrows(dt)
+        update_particles(dt)
 
         winner := check_winner()
         if winner != nil {
@@ -1255,6 +1319,7 @@ frame :: proc (dt: f32) -> bool {
         draw_corpses()
         draw_troops()
         draw_arrows()
+        draw_particles()
         draw_company_targets()
         draw_selected_company()
 

@@ -59,7 +59,7 @@ post_start :: proc () {
     k2.set_shader_constant(post_shaders[.Grain], grain_pixel_scale_loc, f32(camera_board.zoom / TROOP_MAX_SIZE))
     k2.set_shader_constant(post_shaders[.Grain], grain_time_loc,        f32(time))
 
-    k2.set_shader_constant(post_shaders[.Sun], sun_strength_loc, f32(0.4))
+    k2.set_shader_constant(post_shaders[.Sun], sun_strength_loc, f32(0.42))
     k2.set_shader_constant(post_shaders[.Sun], sun_sun_pos_loc,  Vec2{1.2, 1.0})
     k2.set_shader_constant(post_shaders[.Sun], sun_time_loc,     f32(time))
 
