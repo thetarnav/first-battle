@@ -14,6 +14,7 @@ import astar "./grid/path"
 
 
 Vec2  :: k2.Vec2
+Vec2i :: [2]int
 Color :: k2.Color
 Coord :: grid.Coord
 
@@ -1099,6 +1100,8 @@ draw_corpses :: proc () {
     }
 }
 
+TROOP_MAX_SIZE :: f32(2.4) // in world pixels (cells)
+
 draw_troops :: proc () {
     for troop, i in troops {
         si := Troop_Idx(i)
@@ -1118,7 +1121,6 @@ draw_troops :: proc () {
             rot = PI
         }
 
-        max_side := f32(2.4)
         tint := color.lerp(k2.WHITE, k2.DARK_GRAY, troop.combat.dmg_taken/2)
         if htroopi, has_hovered := hovered_troop.?;
            has_hovered && troop_company_idx(htroopi) == troop_company_idx(si) {
@@ -1134,7 +1136,7 @@ draw_troops :: proc () {
         }
 
         tex_rect := atlas_rects[tex_slice]
-        size := fit_aspect_into_min(tex_rect.size, max_side)
+        size := fit_aspect_into_min(tex_rect.size, TROOP_MAX_SIZE)
         rect := Rect{pos-size/2, size}
 
         draw_texture(tex_atlas, rect, tex_rect, rot=rot, tint=tint)
@@ -1208,6 +1210,7 @@ draw_selected_company :: proc () {
 frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
+    grain_update()
 
     game_init()
     context.allocator = state_allocator // state_arena
@@ -1241,21 +1244,40 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-    k2.clear(COLOR_BG)
+	// Render the game into the intermediate texture
+    {
+        k2.set_render_texture(grain_texture)
+        defer k2.set_render_texture(nil)
 
-    k2.set_camera(camera_board)
+        k2.clear(COLOR_BG)
 
-    draw_board()
-    draw_troop_shadows()
-    draw_corpses()
-    draw_troops()
-    draw_arrows()
-    draw_company_targets()
-    draw_selected_company()
+        k2.set_camera(camera_board)
 
-    k2.set_camera(nil)
+        draw_board()
+        draw_troop_shadows()
+        draw_corpses()
+        draw_troops()
+        draw_arrows()
+        draw_company_targets()
+        draw_selected_company()
 
-    ui_frame()
+        k2.set_camera(nil)
+
+        ui_frame()
+    }
+
+    // Draw the processed image to the actual screen
+    {
+        k2.set_shader(grain_shader)
+        defer k2.set_shader(nil)
+
+        k2.clear(COLOR_BG)
+
+        src := k2.get_texture_rect(grain_texture.texture)
+        dst := k2.rect_from_pos_size({}, window_size)
+
+        k2.draw_texture_fit(grain_texture.texture, src, dst)
+    }
 
     return true
 }

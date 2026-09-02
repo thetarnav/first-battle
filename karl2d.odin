@@ -3,12 +3,11 @@ package first_battle
 import k2 "./karl2d"
 
 k2_rect :: proc (rect: Rect) -> k2.Rect {
-    return {
-        x = rect.pos.x,
-        y = rect.pos.y,
-        w = rect.size.x,
-        h = rect.size.y,
-    }
+    return {**rect.pos, **rect.size}
+}
+
+k2_rect_size :: proc (rect: k2.Rect) -> Vec2 {
+    return {rect.w, rect.h}
 }
 
 k2_camera_fit_aspect :: proc (aspect: Vec2, margin: Vec2 = 0) -> k2.Camera {

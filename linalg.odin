@@ -150,7 +150,7 @@ vec2_fit_aspect_max :: proc(aspect, max: vec2) -> vec2 {
 vec2_fit_aspect_min :: proc(aspect, min: vec2) -> vec2 {
 	return aspect * la.max_single(min / aspect)
 }
-fit_aspect_into :: vec2_fit_aspect_max
+fit_aspect_into     :: vec2_fit_aspect_max
 fit_aspect_into_max :: vec2_fit_aspect_max
 fit_aspect_into_min :: vec2_fit_aspect_min
 
