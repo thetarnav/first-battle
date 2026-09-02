@@ -7,8 +7,8 @@ in vec4 frag_color;
 uniform sampler2D tex;
 
 uniform vec2  size;
-uniform float strength;
 uniform float pixel_scale;
+uniform float strength;
 uniform float time;
 
 out vec4 final_color;

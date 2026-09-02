@@ -1211,6 +1211,7 @@ frame :: proc (dt: f32) -> bool {
 
     update_frame_globals()
     grain_update()
+    glow_update()
 
     game_init()
     context.allocator = state_allocator // state_arena
@@ -1244,10 +1245,9 @@ frame :: proc (dt: f32) -> bool {
         }
     }
 
-	// Render the game into the intermediate texture
+    // Render the game into the intermediate texture
     {
         k2.set_render_texture(grain_texture)
-        defer k2.set_render_texture(nil)
 
         k2.clear(COLOR_BG)
 
@@ -1266,10 +1266,10 @@ frame :: proc (dt: f32) -> bool {
         ui_frame()
     }
 
-    // Draw the processed image to the actual screen
+    // Apply grain effect
     {
+        k2.set_render_texture(glow_texture)
         k2.set_shader(grain_shader)
-        defer k2.set_shader(nil)
 
         k2.clear(COLOR_BG)
 
@@ -1278,6 +1278,21 @@ frame :: proc (dt: f32) -> bool {
 
         k2.draw_texture_fit(grain_texture.texture, src, dst)
     }
+
+    // Apply glow effect
+    {
+        k2.set_render_texture(nil)
+        k2.set_shader(glow_shader)
+
+        k2.clear(COLOR_BG)
+
+        src := k2.get_texture_rect(glow_texture.texture)
+        dst := k2.rect_from_pos_size({}, window_size)
+
+        k2.draw_texture_fit(glow_texture.texture, src, dst)
+    }
+
+    k2.set_shader(nil)
 
     return true
 }
