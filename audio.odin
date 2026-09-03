@@ -92,14 +92,13 @@ sfx_bytes := [SFX_Kind][][]byte{
     },
 }
 
-Stream_And_Sound :: struct {stream: k2.Audio_Stream, sound: k2.Sound}
-
 sfx_audio_clips: [SFX_Kind][]k2.Audio_Clip
 sfx_to_play:     [SFX_Kind]bool
 sfx_cooldowns:   [SFX_Kind]f32
 
-songs_streams: [len(songs_bytes)]Stream_And_Sound
-active_song: int
+songs_streams:     [len(songs_bytes)]k2.Audio_Stream
+active_song_sound: k2.Sound
+active_song:       int
 
 g_mute: bool
 
@@ -113,7 +112,7 @@ audio_init :: proc () {
     loaded: bool
     // create streams for all songs
     for bytes, i in songs_bytes {
-        songs_streams[i].stream, loaded = k2.load_audio_stream_from_bytes(bytes)
+        songs_streams[i], loaded = k2.load_audio_stream_from_bytes(bytes)
         assert(loaded, "Failed to load music audio stream")
     }
     // create streams for all sfx (twice for each sfx so they can be played at the same time)
@@ -144,13 +143,13 @@ audio_frame :: proc (dt: f32) {
 
     // update music songs
     if g_mute {
-        k2.stop_sound(songs_streams[active_song].sound)
-    } else if k2.sound_is_playing(songs_streams[active_song].sound) {
-        k2.update_audio_stream(songs_streams[active_song].stream)
+        k2.stop_sound(active_song_sound)
+    } else if k2.sound_is_valid(active_song_sound) {
+        k2.update_audio_stream(songs_streams[active_song])
     } else {
-        k2.stop_sound(songs_streams[active_song].sound)
+        k2.stop_sound(active_song_sound)
         active_song = (active_song+1) % len(songs_streams)
-        songs_streams[active_song].sound = k2.play_audio_stream(songs_streams[active_song].stream)
+        active_song_sound = k2.play_audio_stream(songs_streams[active_song])
     }
 
     if g_mute do return
