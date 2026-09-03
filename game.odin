@@ -373,6 +373,7 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved
 
     s_pos := troop.pos
     e_pos := cell_center(e_idx)
+    if s_pos == e_pos do return true
 
     diff := la.clamp(e_pos-s_pos, 0, la.normalize(e_pos-s_pos))
 
@@ -402,6 +403,8 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved
     velocity := troop.movement.velocity * dt
     next_pos := troop.pos + velocity
 
+    assert(la.is_nan(velocity) == false)
+
     next_celli := cell_idx_from_pos(next_pos) or_return
 
     if troop_add_to_cell(troop, next_celli) {
@@ -411,6 +414,7 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved
         // move in current cell up to the cell border
         next_celli = cell_idx_from_pos(troop.pos)
         pos := rect_clamp_point_exclusive(cell_rect(next_celli), next_pos)
+        assert(la.is_nan(pos) == false)
         assert(next_celli == cell_idx_from_pos(pos))
         if troop.pos != pos {
             moved = true
@@ -425,6 +429,7 @@ troop_apply_force :: proc (troop: Troop_Ptr, e_idx: Cell_Idx, dt: f32) -> (moved
     return true
 }
 troop_set_pos_force :: proc (s: Troop_Ptr, pos: Vec2) {
+    assert(la.is_nan(pos) == false)
 
     cell_idx, pos_in_grid := cell_idx_from_pos(pos)
 
