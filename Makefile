@@ -29,8 +29,7 @@ release-web:
 	$(ODIN) run karl2d/build_web -- . $(VET_FLAGS) $(EXTRA_FLAGS) $(RELEASE_FLAGS)
 
 serve-web:
-	cd bin/web
-	python -m http.server
+	cd bin/web && python -m http.server
 
 debug:
 	$(ODIN) build . $(BUILD_FLAGS) $(EXTRA_FLAGS) \
