@@ -41,7 +41,7 @@ void main() {
     float dist = distance(frag_texcoord, sun_pos) / 1.64;
 
     // Broad soft falloff
-    float light = 1.0 - smoothstep(0.0, 1.0, dist);
+    float light = 1.0 - smoothstep(0.2, 1.0, dist);
 
     // Slowly varying sunlight intensity
     float variation = smooth_random(time, 10.0);
