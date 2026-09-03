@@ -42,6 +42,7 @@ check:
 	$(ODIN) check . $(VET_FLAGS) $(EXTRA_FLAGS) -target:linux_amd64
 	$(ODIN) check . $(VET_FLAGS) $(EXTRA_FLAGS) -target:darwin_amd64
 	$(ODIN) check . $(VET_FLAGS) $(EXTRA_FLAGS) -target:windows_amd64
+	$(ODIN) check . $(VET_FLAGS) $(EXTRA_FLAGS) -target:js_wasm32
 
 # Prevent make from trying to build files named after extra flags
 %:
