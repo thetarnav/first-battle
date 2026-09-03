@@ -314,6 +314,10 @@ troop_config :: proc (idx: Troop_Idx) -> Unit_Config {
 troop_pos :: proc (idx: Troop_Idx) -> Vec2 {
     return troop_get(idx).pos
 }
+troop_update_time_left :: proc (t: Troop_Ptr) {
+    t.movement.time_left = clamp(rand.float32_normal(500, 100), 200, 1000)
+}
+
 company_get :: proc (idx: Company_Idx) -> ^Company {
     return &companies[idx]
 }
@@ -540,6 +544,7 @@ game_init :: proc () {
                 troop_set_pos_force(s, pos)
 
                 s.movement.path = make([dynamic]Cell_Idx)
+                troop_update_time_left(s)
             }
         }
     }
@@ -864,7 +869,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
         troop.movement.time_left -= dt
         time_to_update := troop.movement.time_left <= 0
         if time_to_update {
-            troop.movement.time_left = rand.float32_range(240, 700)
+            troop_update_time_left(troop)
         }
 
         troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
