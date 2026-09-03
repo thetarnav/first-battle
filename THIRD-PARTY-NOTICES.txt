@@ -1,0 +1,208 @@
+THIRD-PARTY NOTICES
+===================
+
+This file documents third-party software and audio assets included in this
+project. These materials are not owned by the project author and are not
+covered by the project's own source-code or creative-asset licenses unless
+explicitly stated otherwise.
+
+The project author has included these notices for attribution and license
+clarity. Third-party materials remain subject to their respective licenses.
+
+
+===============================================================================
+PIXABAY AUDIO
+===============================================================================
+
+The following sound effects and music were obtained from Pixabay and are
+provided under the Pixabay Content License:
+
+https://pixabay.com/service/license-summary/
+
+The original filenames are retained below to make the corresponding assets
+in the repository easy to identify.
+
+Pixabay's Content License generally permits free use for commercial and
+non-commercial purposes, subject to its terms. Attribution is not generally
+required by the Pixabay Content License, but the original creators are listed
+here in appreciation and to make the provenance of the assets explicit.
+
+SOUND EFFECTS
+-------------
+
+54427377-sword-slash-476148.wav
+    Title: Sword slash
+    Creator: 54427377
+    Source: https://pixabay.com/sound-effects/sword-slash-476148/
+
+
+dennish18-arrow-body-impact-146419.wav
+    Title: Arrow Body Impact
+    Creator: DennisH18
+    Source: https://pixabay.com/sound-effects/arrow-body-impact-146419/
+    Creator profile: https://pixabay.com/users/dennish18-26151496/
+
+
+dennish18-arrow-wood-impact-146418.wav
+    Title: Arrow Wood Impact
+    Creator: DennisH18
+    Source: https://pixabay.com/sound-effects/arrow-wood-impact-146418/
+    Creator profile: https://pixabay.com/users/dennish18-26151496/
+
+
+djartmusic-arrow-swish_03-306040.wav
+    Title: Arrow Swish_03
+    Creator: DJARTMUSIC
+    Source: https://pixabay.com/sound-effects/arrow-swish-03-306040/
+
+
+dragon-studio-sword-fight-393849-1.wav
+    Title: Sword Fight (393849)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-fight-393849/
+
+
+dragon-studio-sword-fight-393849-2.wav
+    Title: Sword Fight (393849)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-fight-393849/
+
+
+dragon-studio-sword-fight-393849-3.wav
+    Title: Sword Fight (393849)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-fight-393849/
+
+
+dragon-studio-sword-fight-393849-4.wav
+    Title: Sword Fight (393849)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-fight-393849/
+
+
+dragon-studio-sword-fight-393849-5.wav
+    Title: Sword Fight (393849)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-fight-393849/
+
+
+dragon-studio-sword-slice-393847.wav
+    Title: Sword Slice (393847)
+    Creator: DRAGON-STUDIO
+    Source: https://pixabay.com/sound-effects/sword-slice-393847/
+
+
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-1.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-2.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-3.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-4.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-5.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-6.wav
+freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-7.wav
+    Title: 180904-woodland04 run steps skip jump clip
+    Original creator: martian (Freesound)
+    Pixabay listing: https://pixabay.com/sound-effects/film-special-effects-180904-woodland04-run-steps-skip-jump-clip-47486/
+    License: Pixabay Content License
+
+
+freesound_community-footsteps-in-thin-snow-46199-1.wav
+freesound_community-footsteps-in-thin-snow-46199-2.wav
+freesound_community-footsteps-in-thin-snow-46199-3.wav
+freesound_community-footsteps-in-thin-snow-46199-4.wav
+freesound_community-footsteps-in-thin-snow-46199-5.wav
+freesound_community-footsteps-in-thin-snow-46199-6.wav
+freesound_community-footsteps-in-thin-snow-46199-7.wav
+freesound_community-footsteps-in-thin-snow-46199-8.wav
+freesound_community-footsteps-in-thin-snow-46199-9.wav
+    Title: Footsteps in thin snow
+    Original creator: christer@hantilson.com (Freesound)
+    Pixabay listing: https://pixabay.com/sound-effects/film-special-effects-footsteps-in-thin-snow-46199/
+    License: Pixabay Content License
+
+
+freesound_community-sword-sound-2-36274.wav
+    Title: Sword sound 2
+    Original creator: Merrick079 (Freesound)
+    Source: https://pixabay.com/sound-effects/film-special-effects-sword-sound-2-36274/
+    License: Pixabay Content License
+
+
+musicholder-sword-sound-260274.wav
+    Title: Sword sound
+    Creator: MUSICHOLDER
+    Source: https://pixabay.com/sound-effects/film-special-effects-sword-sound-260274/
+
+
+pwlpl-horses-galloping-sound-effect-359257.wav
+    Title: Horses Galloping Sound Effect
+    Creator: PWLPL
+    Source: https://pixabay.com/sound-effects/nature-horses-galloping-sound-effect-359257/
+
+
+universfield-sword-blade-slicing-flesh-352708.wav
+    Title: Sword Blade Slicing Flesh
+    Creator: Universfield
+    Source: https://pixabay.com/sound-effects/film-special-effects-sword-blade-slicing-flesh-352708/
+
+
+virtual_vibes-thud-impact-sound-sfx-379990.wav
+    Title: Thud Impact Sound SFX
+    Creator: Virtual_Vibes
+    Source: https://pixabay.com/sound-effects/thud-impact-sound-sfx-379990/
+
+
+yodguard-shield_impact-1-382410.wav
+    Title: Shield Impact 1
+    Creator: yodguard
+    Source: https://pixabay.com/sound-effects/shield-impact-1-382410/
+
+
+yodguard-shield_impact-5-382415.wav
+    Title: Shield Impact 5
+    Creator: yodguard
+    Source: https://pixabay.com/sound-effects/shield-impact-5-382415/
+
+
+MUSIC
+-----
+
+montogoronto-dark-orchestral-battle-tension-395613.ogg
+    Title: Dark Orchestral Battle Tension
+    Creator: Montogoronto
+    Source: https://pixabay.com/music/build-up-scenes-dark-orchestral-battle-tension-395613/
+
+
+rolandomat-epic-battle-song-182915.ogg
+    Title: Epic Battle Song
+    Creator: Rolandomat
+    Source: https://pixabay.com/music/main-title-epic-battle-song-182915/
+
+
+===============================================================================
+THIRD PARTY LIBRARIES
+===============================================================================
+
+This project includes the following Git submodules:
+
+    ./grid
+    ./karl2d
+
+These libraries are third-party projects and retain their own licenses. Their
+license files are included within the respective submodule directories.
+
+The licenses in those submodules apply to the corresponding submodule code
+and are not replaced or superseded by this project's licenses.
+
+
+===============================================================================
+ODIN CORE LIBRARY
+===============================================================================
+
+This project uses Odin's core library.
+
+The Odin core library is distributed under the zlib License. The license and
+copyright notice applicable to Odin's core library are provided by the Odin
+project and apply to that code independently of this project's licenses.
+
+Odin project:
+https://odin-lang.org/
