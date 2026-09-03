@@ -104,8 +104,7 @@ Particle :: struct {
     start: f64,
 }
 
-@rodata
-initial_army_units: []struct {kind: Unit_Kind, pos: Coord, count: int} = {
+INIT_ARMY_UNITS :: [?]struct {kind: Unit_Kind, pos: Coord, count: int}{
     {.Riders,   {20,  40}, 50},
     {.Heavy,    {22,  18}, 50},
     {.Archers,  {54,  14}, 60},
@@ -168,9 +167,9 @@ automatic := [Army_Side]bool{
 is_automatic :: proc (side: Army_Side) -> bool {return automatic[side]}
 
 troops:    Troop_Arr
-companies: [dynamic]Company
-arrows:    [dynamic]Arrow
-particles: [dynamic]Particle
+companies: [dynamic; len(INIT_ARMY_UNITS) * 2]Company
+arrows:    [dynamic; 600]Arrow
+particles: [dynamic; 2000]Particle
 
 hovered_troop:    Maybe(Troop_Idx)
 selected_company: Maybe(Company_Idx)
@@ -497,10 +496,10 @@ game_init :: proc () {
     for &army, side in armies {
 
         army.side  = side
-        army.units = make([]Company_Idx, len(initial_army_units))
+        army.units = make([]Company_Idx, len(INIT_ARMY_UNITS))
 
         // each company
-        for initial, ci in initial_army_units {
+        for initial, ci in INIT_ARMY_UNITS {
 
             append_nothing(&companies)
             compi := Company_Idx(len(companies)-1)
