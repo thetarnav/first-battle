@@ -1,5 +1,7 @@
 # My First Battle as a Commanding General
 
+A mini tactical battle simulator game made with [Karl2D](https://github.com/karl-zylinski/karl2d) and [Odin](https://odin-lang.org).
+
 ## License
 
 This project uses separate licenses for its source code and creative assets:
