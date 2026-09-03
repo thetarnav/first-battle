@@ -115,7 +115,7 @@ audio_init :: proc () {
         songs_streams[i], loaded = k2.load_audio_stream_from_bytes(bytes)
         assert(loaded, "Failed to load music audio stream")
     }
-    // create streams for all sfx (twice for each sfx so they can be played at the same time)
+    // create audio clips for all sfx
     for &kind_clips, kind in sfx_audio_clips {
         kind_clips = make([]k2.Audio_Clip, len(sfx_bytes[kind]))
         for &clip, i in kind_clips {
