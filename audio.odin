@@ -22,17 +22,17 @@ SFX_Config :: struct {
     cap:       int,
 }
 
-SFX_GLOBAL_CAP :: 32
+SFX_GLOBAL_CAP :: 14
 
 sfx_config := [SFX_Kind]SFX_Config{
-    .Sword_Slash   = {volume=0.42, pitch_var=0.15, cooldown=100, cap=4},
-    .Sword_Impact  = {volume=0.5,  pitch_var=0.15, cooldown=100, cap=4},
-    .Arrow_Swish   = {volume=0.3,  pitch_var=0.2,  cooldown=80,  cap=5},
-    .Arrow_Impact  = {volume=0.24, pitch_var=0.2,  cooldown=200, cap=3},
-    .Shield_Impact = {volume=0.44, pitch_var=0.1,  cooldown=150, cap=2},
-    .Thud_Impact   = {volume=0.4,  pitch_var=0.15, cooldown=200, cap=3},
-    .Infantry_Run  = {volume=0.5,  pitch_var=0.25, cooldown=60,  cap=20},
-    .Horse_Run     = {volume=0.4,  pitch_var=0.05, cooldown=200, cap=2},
+    .Sword_Slash   = {volume=0.32, pitch_var=0.15, cooldown=340, cap=2},
+    .Sword_Impact  = {volume=0.30, pitch_var=0.15, cooldown=380, cap=2},
+    .Arrow_Swish   = {volume=0.12, pitch_var=0.25, cooldown=260, cap=2},
+    .Arrow_Impact  = {volume=0.16, pitch_var=0.20, cooldown=300, cap=2},
+    .Shield_Impact = {volume=0.40, pitch_var=0.10, cooldown=320, cap=1},
+    .Thud_Impact   = {volume=0.32, pitch_var=0.15, cooldown=340, cap=1},
+    .Infantry_Run  = {volume=0.36, pitch_var=0.25, cooldown=240, cap=12},
+    .Horse_Run     = {volume=0.38, pitch_var=0.05, cooldown=300, cap=2},
 }
 
 songs_bytes := [?][]byte{
@@ -182,7 +182,7 @@ audio_frame :: proc (dt: f32) {
             pitch  = 1 + rand.float32_range(-kind_config.pitch_var, kind_config.pitch_var),
         )
         sfx_playing_count_all += 1
-        sfx_cooldowns[kind] = kind_config.cooldown
+        sfx_cooldowns[kind] = kind_config.cooldown * rand.float32_range(-0.2, 0.2)
     }
 }
 

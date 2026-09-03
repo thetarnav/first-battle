@@ -699,9 +699,9 @@ troop_attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
     dmg := tconfig.dmg_static + tconfig.dmg_move * la.length(troop.movement.velocity)
     dmg /= econfig.armor
 
-    if econfig.armor > 1 && rand.int63() > 0 {
+    if econfig.armor > 1 && int(rand.uint64()) > 0 {
         play_sfx(.Shield_Impact)
-    } else if rand.int63() > 0 {
+    } else if int(rand.uint64()) > 0 {
         play_sfx(.Sword_Impact)
     } else {
         play_sfx(.Sword_Slash)
