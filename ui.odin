@@ -34,7 +34,7 @@ ui_frame :: proc () {
     k2.set_camera(camera_ui)
     defer k2.set_camera(nil)
 
-    ui_mouse      = k2.screen_to_world(mouse_pos, camera_ui)
+    ui_mouse      = k2.screen_to_camera(mouse_pos, camera_ui)
     ui_world_size = la.floor(window_size / UI_PIXEL_SCALE)
     ui_center     = ui_world_size/2
 

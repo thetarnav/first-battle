@@ -35,108 +35,107 @@ sfx_config := [SFX_Kind]SFX_Config{
     .Horse_Run     = {volume=0.4,  pitch_var=0.05, cooldown=200, cap=2},
 }
 
-songs_bytes := [][]byte{
+songs_bytes := [?][]byte{
     #load("audio/montogoronto-dark-orchestral-battle-tension-395613.ogg"),
     #load("audio/rolandomat-epic-battle-song-182915.ogg"),
 }
 
 sfx_bytes := [SFX_Kind][][]byte{
     .Sword_Slash = {
-        #load("audio/54427377-sword-slash-476148.ogg"),
-        #load("audio/dragon-studio-sword-slice-393847.ogg"),
-        #load("audio/freesound_community-sword-sound-2-36274.ogg"),
-        #load("audio/musicholder-sword-sound-260274.ogg"),
-        #load("audio/universfield-sword-blade-slicing-flesh-352708.ogg"),
+        #load("audio/54427377-sword-slash-476148.wav"),
+        #load("audio/dragon-studio-sword-slice-393847.wav"),
+        #load("audio/freesound_community-sword-sound-2-36274.wav"),
+        #load("audio/musicholder-sword-sound-260274.wav"),
+        #load("audio/universfield-sword-blade-slicing-flesh-352708.wav"),
     },
     .Sword_Impact = {
-        #load("audio/dragon-studio-sword-fight-393849-1.ogg"),
-        #load("audio/dragon-studio-sword-fight-393849-2.ogg"),
-        #load("audio/dragon-studio-sword-fight-393849-3.ogg"),
-        #load("audio/dragon-studio-sword-fight-393849-4.ogg"),
-        #load("audio/dragon-studio-sword-fight-393849-5.ogg"),
+        #load("audio/dragon-studio-sword-fight-393849-1.wav"),
+        #load("audio/dragon-studio-sword-fight-393849-2.wav"),
+        #load("audio/dragon-studio-sword-fight-393849-3.wav"),
+        #load("audio/dragon-studio-sword-fight-393849-4.wav"),
+        #load("audio/dragon-studio-sword-fight-393849-5.wav"),
     },
     .Arrow_Swish = {
-        #load("audio/djartmusic-arrow-swish_03-306040.ogg"),
+        #load("audio/djartmusic-arrow-swish_03-306040.wav"),
     },
     .Arrow_Impact = {
-        #load("audio/dennish18-arrow-body-impact-146419.ogg"),
-        #load("audio/dennish18-arrow-wood-impact-146418.ogg"),
+        #load("audio/dennish18-arrow-body-impact-146419.wav"),
+        #load("audio/dennish18-arrow-wood-impact-146418.wav"),
     },
     .Thud_Impact = {
-        #load("audio/virtual_vibes-thud-impact-sound-sfx-379990.ogg"),
+        #load("audio/virtual_vibes-thud-impact-sound-sfx-379990.wav"),
     },
     .Shield_Impact = {
-        #load("audio/yodguard-shield_impact-1-382410.ogg"),
-        #load("audio/yodguard-shield_impact-5-382415.ogg"),
+        #load("audio/yodguard-shield_impact-1-382410.wav"),
+        #load("audio/yodguard-shield_impact-5-382415.wav"),
     },
     .Infantry_Run = {
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-1.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-2.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-3.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-4.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-5.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-6.ogg"),
-        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-7.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-1.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-2.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-3.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-4.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-5.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-6.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-7.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-8.ogg"),
-        #load("audio/freesound_community-footsteps-in-thin-snow-46199-9.ogg"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-1.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-2.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-3.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-4.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-5.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-6.wav"),
+        #load("audio/freesound_community-180904-woodland04-run-steps-skip-jump-clip-47486-7.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-1.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-2.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-3.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-4.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-5.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-6.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-7.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-8.wav"),
+        #load("audio/freesound_community-footsteps-in-thin-snow-46199-9.wav"),
     },
     .Horse_Run = {
-        #load("audio/pwlpl-horses-galloping-sound-effect-359257.ogg"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257.wav"),
     },
 }
 
-sfx_streams:   [SFX_Kind][]k2.Audio_Stream
-sfx_to_play:   [SFX_Kind]bool
-sfx_cooldowns: [SFX_Kind]f32
+Stream_And_Sound :: struct {stream: k2.Audio_Stream, sound: k2.Sound}
 
-songs_streams: []k2.Audio_Stream
+sfx_audio_clips: [SFX_Kind][]k2.Audio_Clip
+sfx_to_play:     [SFX_Kind]bool
+sfx_cooldowns:   [SFX_Kind]f32
+
+songs_streams: [len(songs_bytes)]Stream_And_Sound
 active_song: int
 
 g_mute: bool
 
 play_sfx :: proc (kind: SFX_Kind) {
-    sfx_to_play[kind] = true
+    if !g_mute {
+        sfx_to_play[kind] = true
+    }
 }
 
 audio_init :: proc () {
+    loaded: bool
     // create streams for all songs
-    songs_streams = make([]k2.Audio_Stream, len(songs_bytes))
     for bytes, i in songs_bytes {
-        songs_streams[i] = k2.load_audio_stream_from_bytes(bytes)
+        songs_streams[i].stream, loaded = k2.load_audio_stream_from_bytes(bytes)
+        assert(loaded, "Failed to load music audio stream")
     }
     // create streams for all sfx (twice for each sfx so they can be played at the same time)
-    for &kind_streams, kind in sfx_streams {
-        kind_streams = make([]k2.Audio_Stream, len(sfx_bytes[kind]) * 2)
-        for &s, i in kind_streams {
-            s = k2.load_audio_stream_from_bytes(sfx_bytes[kind][i / 2])
+    for &kind_clips, kind in sfx_audio_clips {
+        kind_clips = make([]k2.Audio_Clip, len(sfx_bytes[kind]))
+        for &clip, i in kind_clips {
+            clip, loaded = k2.load_audio_clip_from_bytes(sfx_bytes[kind][i])
+            assert(loaded, "Failed to load sfx audio clip")
         }
     }
 }
 
 get_sfx_playing_by_kind :: proc (playing: ^[SFX_Kind]int) {
-
-    for kind_streams, kind in sfx_streams {
-
-        count: int
-        for stream in kind_streams {
-            if k2.is_audio_stream_playing(stream) {
-                count += 1
-            }
+    playing^ = {}
+    for kind_clips, kind in sfx_audio_clips {
+        for clip in kind_clips {
+            playing[kind] += k2.get_num_sounds_playing_clip(clip)
         }
-
-        playing[kind] = count
     }
 }
 
 audio_frame :: proc (dt: f32) {
-    if g_mute do return
 
     // reduce cooldoowns
     for &c in sfx_cooldowns {
@@ -144,70 +143,51 @@ audio_frame :: proc (dt: f32) {
     }
 
     // update music songs
-    k2.update_audio_stream(songs_streams[active_song])
-    if !k2.is_audio_stream_playing(songs_streams[active_song]) {
-        k2.pause_audio_stream(songs_streams[active_song])
+    if g_mute {
+        k2.stop_sound(songs_streams[active_song].sound)
+    } else if k2.sound_is_playing(songs_streams[active_song].sound) {
+        k2.update_audio_stream(songs_streams[active_song].stream)
+    } else {
+        k2.stop_sound(songs_streams[active_song].sound)
         active_song = (active_song+1) % len(songs_streams)
-        k2.play_audio_stream(songs_streams[active_song])
+        songs_streams[active_song].sound = k2.play_audio_stream(songs_streams[active_song].stream)
     }
 
-    // update all sfx
-    sfx_playing_count_all: int
-    for streams_by_sfx in sfx_streams {
-        for stream in streams_by_sfx {
-            k2.update_audio_stream(stream)
-            if k2.is_audio_stream_playing(stream) {
-                sfx_playing_count_all += 1
-            } else {
-                k2.pause_audio_stream(stream)
-            }
-        }
-    }
-
+    if g_mute do return
 
     sfx_playing_count: [SFX_Kind]int
     get_sfx_playing_by_kind(&sfx_playing_count)
+
+    sfx_playing_count_all: int
+    for count in sfx_playing_count {
+        sfx_playing_count_all += count
+    }
 
     // play new sfx
     defer sfx_to_play = {}
     for kind_requested, kind in sfx_to_play do if kind_requested {
 
-        kind_cfg     := sfx_config[kind]
-        kind_streams := sfx_streams[kind]
-        assert(len(kind_streams) > 0)
+        kind_config := sfx_config[kind]
+        kind_clips  := sfx_audio_clips[kind]
+        assert(len(kind_clips) > 0)
 
         if sfx_cooldowns[kind] > 0 do break
         if sfx_playing_count_all   >= SFX_GLOBAL_CAP do break
-        if sfx_playing_count[kind] >= kind_cfg.cap do break
-        if sfx_playing_count[kind] >= len(kind_streams) do break
+        if sfx_playing_count[kind] >= kind_config.cap do break
 
-        sfx_idx := rand.int_max(len(kind_streams))
-        stream: k2.Audio_Stream
-        for {
-            stream = kind_streams[sfx_idx]
-            k2.is_audio_stream_playing(stream) or_break
-            sfx_idx = (sfx_idx+1) % len(kind_streams)
-        }
+        sfx_idx := rand.int_max(len(kind_clips))
+        clip := kind_clips[sfx_idx]
 
-        k2.set_audio_stream_pitch(stream, 1 + rand.float32_range(-kind_cfg.pitch_var, kind_cfg.pitch_var))
-        k2.set_audio_stream_volume(stream, kind_cfg.volume * (1 + rand.float32_range(-0.2, 0.2)))
-        k2.play_audio_stream(stream)
+        k2.play_audio_clip(clip,
+            volume = kind_config.volume * (1 + rand.float32_range(-0.2, 0.2)),
+            pitch  = 1 + rand.float32_range(-kind_config.pitch_var, kind_config.pitch_var),
+        )
         sfx_playing_count_all += 1
-        sfx_cooldowns[kind] = kind_cfg.cooldown
+        sfx_cooldowns[kind] = kind_config.cooldown
     }
 }
 
 audio_toggle_mute :: proc (mute: Maybe(bool) = nil) {
-
-    new_mute := mute.? or_else !g_mute
-
-    if g_mute == new_mute do return
-    g_mute = new_mute
-
-    if g_mute {
-        k2.pause_audio_stream(songs_streams[active_song])
-    } else {
-        k2.play_audio_stream(songs_streams[active_song])
-    }
+    g_mute = mute.? or_else !g_mute
 }
 

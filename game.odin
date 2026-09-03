@@ -554,7 +554,7 @@ update_frame_globals :: proc () {
     board_rect   = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
     camera_board = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
     mouse_pos    = k2.get_mouse_position()
-    mouse_world  = k2.screen_to_world(mouse_pos, camera_board)
+    mouse_world  = k2.screen_to_camera(mouse_pos, camera_board)
 }
 
 update_hover :: proc () -> (ok: bool) {
