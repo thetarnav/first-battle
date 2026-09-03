@@ -1284,13 +1284,14 @@ frame :: proc (dt: f32) -> bool {
         update_automatic()
         update_troops(dt)
         update_arrows(dt)
-        update_particles(dt)
 
         winner := check_winner()
         if winner != nil {
             ui_view = .End
         }
     }
+
+    update_particles(dt) // Always update particles since they are only visual
 
     if k2.key_went_down(.Q) { // Quit
         return false
