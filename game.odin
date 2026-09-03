@@ -874,16 +874,14 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
 
         troop.movement.velocity *= math.pow(troop_config.frict, dt) // damping
 
-        velocity_length := la.length(troop.movement.velocity)
-        if velocity_length > 0.002 {
+        if time_to_update && la.length(troop.movement.velocity) > 0.002 {
+
             switch troop_company(troopi).kind {
             case .Infantry, .Heavy, .Archers: play_sfx(.Infantry_Run)
             case .Riders:                     play_sfx(.Horse_Run)
             }
 
-            if time_to_update {
-                spawn_dust_cloud(troop.pos, velocity_length * troop_config.armor)
-            }
+            spawn_dust_cloud(troop.pos, la.length(troop.movement.velocity) * troop_config.armor)
         }
 
         // handle archers shooting before any movement
