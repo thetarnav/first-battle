@@ -20,25 +20,25 @@ post_textures:  [2]k2.Render_Texture
 
 post_init :: proc () {
 
-    SHADER_SRC_VERT     :: #load("./shaders/base.vert")
-    SHADER_SRC_GRAIN    :: #load("./shaders/grain.frag")
-    SHADER_SRC_SUN      :: #load("./shaders/sun.frag")
-    SHADER_SRC_VIGNETTE :: #load("./shaders/vignette.frag")
+    shader_src_vert     := #load("./shaders/base.vert")
+    shader_src_grain    := #load("./shaders/grain.frag")
+    shader_src_sun      := #load("./shaders/sun.frag")
+    shader_src_vignette := #load("./shaders/vignette.frag")
 
-    post_shaders[.Grain] = k2.load_shader_from_bytes(SHADER_SRC_VERT, SHADER_SRC_GRAIN)
+    post_shaders[.Grain] = k2.load_shader_from_bytes(shader_src_vert, shader_src_grain)
 
     grain_size_loc        = post_shaders[.Grain].constant_lookup["size"]
     grain_pixel_scale_loc = post_shaders[.Grain].constant_lookup["pixel_scale"]
     grain_strength_loc    = post_shaders[.Grain].constant_lookup["strength"]
     grain_time_loc        = post_shaders[.Grain].constant_lookup["time"]
 
-    post_shaders[.Sun] = k2.load_shader_from_bytes(SHADER_SRC_VERT, SHADER_SRC_SUN)
+    post_shaders[.Sun] = k2.load_shader_from_bytes(shader_src_vert, shader_src_sun)
 
     sun_sun_pos_loc  = post_shaders[.Sun].constant_lookup["sun_pos"]
     sun_strength_loc = post_shaders[.Sun].constant_lookup["strength"]
     sun_time_loc     = post_shaders[.Sun].constant_lookup["time"]
 
-    post_shaders[.Vignette] = k2.load_shader_from_bytes(SHADER_SRC_VERT, SHADER_SRC_VIGNETTE)
+    post_shaders[.Vignette] = k2.load_shader_from_bytes(shader_src_vert, shader_src_vignette)
 }
 
 post_start :: proc () {
