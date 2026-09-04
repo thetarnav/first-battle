@@ -22,8 +22,10 @@ UI_PIXEL_SCALE :: 4.0
 ui_frame :: proc () {
 
     // debug ui
-    draw_cross(mouse_pos, k2.GREEN)
-    draw_cross(window_size/2, k2.GRAY)
+    when ODIN_DEBUG {
+        draw_cross(mouse_pos, k2.GREEN)
+        draw_cross(window_size/2, k2.GRAY)
+    }
 
     // cover
     if ui_view != .Game {

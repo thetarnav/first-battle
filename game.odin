@@ -1226,6 +1226,7 @@ draw_particles :: proc () {
     }
 }
 
+@(disabled=!ODIN_DEBUG)
 draw_company_targets :: proc () {
     for comp in companies do if len(comp.alive_units) > 0 {
 

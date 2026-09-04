@@ -4,6 +4,8 @@ import "core:time"
 import "core:fmt"
 import k2 "./karl2d"
 
+_ :: fmt
+
 main :: proc () {
     init()
     for step() {}
@@ -53,10 +55,12 @@ step :: proc () -> bool {
     frame(capped_dt) or_return
     audio_frame(capped_dt)
 
-    fps := 1000.0/dt
-    k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.WHITE)
+    when ODIN_DEBUG {
+        fps := 1000.0/dt
+        k2.draw_text(fmt.tprint(int(fps)), 11, 20, k2.WHITE)
+    }
 
-    {
+    when ODIN_DEBUG {
         y: f32
         sfx_playing_count: [SFX_Kind]int
         get_sfx_playing_by_kind(&sfx_playing_count)
