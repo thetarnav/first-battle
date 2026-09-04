@@ -25,14 +25,14 @@ SFX_Config :: struct {
 SFX_GLOBAL_CAP :: 14
 
 sfx_config := [SFX_Kind]SFX_Config{
-    .Sword_Slash   = {volume=0.32, pitch_var=0.15, cooldown=340, cap=2},
-    .Sword_Impact  = {volume=0.30, pitch_var=0.15, cooldown=380, cap=2},
-    .Arrow_Swish   = {volume=0.12, pitch_var=0.25, cooldown=260, cap=2},
-    .Arrow_Impact  = {volume=0.16, pitch_var=0.20, cooldown=300, cap=2},
-    .Shield_Impact = {volume=0.40, pitch_var=0.10, cooldown=320, cap=1},
-    .Thud_Impact   = {volume=0.32, pitch_var=0.15, cooldown=340, cap=1},
-    .Infantry_Run  = {volume=0.36, pitch_var=0.25, cooldown=240, cap=12},
-    .Horse_Run     = {volume=0.38, pitch_var=0.05, cooldown=300, cap=2},
+    .Sword_Slash   = {volume=0.30, pitch_var=0.15, cooldown=350, cap=2},
+    .Sword_Impact  = {volume=0.28, pitch_var=0.15, cooldown=390, cap=2},
+    .Arrow_Swish   = {volume=0.12, pitch_var=0.25, cooldown=270, cap=2},
+    .Arrow_Impact  = {volume=0.16, pitch_var=0.20, cooldown=310, cap=2},
+    .Shield_Impact = {volume=0.38, pitch_var=0.10, cooldown=330, cap=1},
+    .Thud_Impact   = {volume=0.32, pitch_var=0.15, cooldown=350, cap=1},
+    .Infantry_Run  = {volume=0.36, pitch_var=0.25, cooldown=240, cap=10},
+    .Horse_Run     = {volume=0.37, pitch_var=0.20, cooldown=280, cap=8},
 }
 
 songs_bytes := [?][]byte{
@@ -88,7 +88,15 @@ sfx_bytes := [SFX_Kind][][]byte{
         #load("audio/freesound_community-footsteps-in-thin-snow-46199-9.wav"),
     },
     .Horse_Run = {
-        #load("audio/pwlpl-horses-galloping-sound-effect-359257.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-1.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-2.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-3.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-4.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-5.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-6.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-7.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-8.wav"),
+        #load("audio/pwlpl-horses-galloping-sound-effect-359257-9.wav"),
     },
 }
 
