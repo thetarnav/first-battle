@@ -31,8 +31,8 @@ sfx_config := [SFX_Kind]SFX_Config{
     .Arrow_Impact  = {volume=0.16, pitch_var=0.20, cooldown=310, cap=2},
     .Shield_Impact = {volume=0.38, pitch_var=0.10, cooldown=330, cap=1},
     .Thud_Impact   = {volume=0.32, pitch_var=0.15, cooldown=350, cap=1},
-    .Infantry_Run  = {volume=0.36, pitch_var=0.25, cooldown=240, cap=10},
-    .Horse_Run     = {volume=0.37, pitch_var=0.20, cooldown=280, cap=8},
+    .Infantry_Run  = {volume=0.36, pitch_var=0.10, cooldown=240, cap=10},
+    .Horse_Run     = {volume=0.37, pitch_var=0.10, cooldown=280, cap=8},
 }
 
 songs_bytes := [?][]byte{
