@@ -1,6 +1,5 @@
 package first_battle
 
-import "core:time"
 import "core:fmt"
 import k2 "./karl2d"
 
@@ -21,18 +20,7 @@ init :: proc () {
 }
 
 MAX_FPS :: 60.0
-MIN_FPS :: 12.0
-
-MAX_DT :: 1000.0 / MAX_FPS
-MIN_DT :: 1000.0 / MIN_FPS
-
-time_now :: proc () -> f32 {
-    @static start: time.Time
-    if start == {} {
-        start = time.now()
-    }
-    return f32(time.duration_milliseconds(time.since(start)))
-}
+MAX_DT  :: 1000.0 / MAX_FPS
 
 step :: proc () -> bool {
 
