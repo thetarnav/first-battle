@@ -13,7 +13,7 @@ main :: proc () {
 }
 
 init :: proc () {
-    k2.init(1280, 720, "Greetings from Karl2D!", {
+    k2.init(1280, 720, "My First Battle as a Commanding General", {
         window_mode = .Windowed_Resizable,
     })
     audio_init()
