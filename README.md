@@ -2,6 +2,11 @@
 
 A mini tactical battle simulator game made with [Karl2D](https://github.com/karl-zylinski/karl2d) and [Odin](https://odin-lang.org).
 
+[<img width="630" height="500" alt="image" src="https://github.com/user-attachments/assets/f0ecd1b8-2c2c-46a2-9cbe-9b88ebd5479f" />](https://thetarnav.itch.io/first-battle)
+
+Play the game on itch.io: https://thetarnav.itch.io/first-battle \
+or github pages: https://thetarnav.github.io/first-battle
+
 ## License
 
 This project uses separate licenses for its source code and creative assets:
