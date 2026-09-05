@@ -36,20 +36,8 @@ time_now :: proc () -> f32 {
 
 step :: proc () -> bool {
 
-    @static time_last: f32
-    @static time_miss: f32
-
-    time_now   := time_now()
-    dt         := time_now - time_last
-    elapsed    := dt + time_miss
+    dt := k2.get_frame_time()*1000 // in ms
     capped_dt  := min(dt, MAX_DT*2)
-
-    if elapsed < MAX_DT {
-        return true
-    }
-
-    time_last = time_now
-    time_miss = max(0, elapsed - MAX_DT) // Carry over extra time
 
     k2.update() or_return
     frame(capped_dt) or_return
