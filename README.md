@@ -1,6 +1,6 @@
 # My First Battle as a Commanding General
 
-A mini tactical battle simulator game made with [Karl2D](https://github.com/karl-zylinski/karl2d) and [Odin](https://odin-lang.org).
+A mini, medieval real-time tactics game made with [Karl2D](https://github.com/karl-zylinski/karl2d) and [Odin](https://odin-lang.org).
 
 [<img width="630" height="500" alt="image" src="https://github.com/user-attachments/assets/f0ecd1b8-2c2c-46a2-9cbe-9b88ebd5479f" />](https://thetarnav.itch.io/first-battle)
 
