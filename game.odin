@@ -717,6 +717,8 @@ troop_attack :: proc (troop, enemy: Troop_Ptr) -> (ok: bool) {
         play_sfx(.Sword_Slash)
     }
 
+    spawn_dust_cloud(troop.pos, min(dmg * 10000, 4000))
+
     enemy.combat.in_fight += 0.8
     new_dmg := min(enemy.combat.dmg_taken + dmg, 1)
     if enemy.combat.dmg_taken < 1 && new_dmg >= 1 {
@@ -886,7 +888,7 @@ update_troops :: proc (dt: f32) -> (ok: bool) {
             case .Riders:                     play_sfx(.Horse_Run)
             }
 
-            spawn_dust_cloud(troop.pos, la.length(troop.movement.velocity) * troop_config.armor)
+            spawn_dust_cloud(troop.pos, la.length(troop.movement.velocity) * troop_config.armor * 100_000)
         }
 
         // handle archers shooting before any movement
@@ -1091,9 +1093,9 @@ update_particles :: proc (dt: f32) {
     }
 }
 
-spawn_dust_cloud :: proc (pos: Vec2, vel: f32) {
-    life := vel * 100_000
+spawn_dust_cloud :: proc (pos: Vec2, life: f32) {
     if life <= 1 do return
+    life := life
     life += rand.float32_range(0, 1600)
     append(&particles, Particle{
         kind  = .Dust,
