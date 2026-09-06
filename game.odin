@@ -40,6 +40,7 @@ Unit_Kind :: enum u8 {
     Riders,
     Archers,
 }
+Company_Target :: union #no_nil {Cell_Idx, Company_Idx}
 Company :: struct {
     side:        Army_Side,
     idx:         Company_Idx,
@@ -47,7 +48,7 @@ Company :: struct {
     units:       []Troop_Idx,
     alive_units: []Troop_Idx,
     avg_pos:     Vec2,
-    target:      union #no_nil {Cell_Idx, Company_Idx},
+    target:      Company_Target,
 }
 Company_Idx :: distinct u16
 
@@ -1232,36 +1233,57 @@ draw_particles :: proc () {
     }
 }
 
+draw_target :: proc (comp: Company, target: Company_Target, color: Color) {
+
+    start := comp.avg_pos
+    end   := comp.avg_pos
+
+    switch t in target {
+    case Cell_Idx:
+        end = cell_center(t)
+    case Company_Idx:
+        tcomp := company_get(t)
+        end = tcomp.avg_pos
+    }
+
+    dist := la.distance(start, end)
+    if dist < 2 do return
+
+    DASH  :: 3
+    GAP   :: 1.2
+    WIDTH :: 0.6
+
+    d := la.normalize(end-start)
+    cursor := start
+    for _ in 0 ..< dist / (DASH+GAP) - 1 {
+        s := cursor
+        e := cursor + d * DASH
+
+        cursor = e + d * GAP
+
+        k2.draw_line(s, e, WIDTH, color)
+    }
+}
 draw_company_targets :: proc () {
+
+    // Current targets
     for comp in companies do if len(comp.alive_units) > 0 && !is_automatic(comp.side) {
+        draw_target(comp, comp.target, COLOR_SHADOW)
+    }
 
-        start := comp.avg_pos
-        end   := comp.avg_pos
+    // Hovered target of selected company
+    if compi, has_selected := selected_company.?; has_selected {
+        comp := company_get(compi)
 
-        switch t in comp.target {
-        case Cell_Idx:
-            end = cell_center(t)
-        case Company_Idx:
-            tcomp := company_get(t)
-            end = tcomp.avg_pos
-        }
-
-        dist := la.distance(start, end)
-        if dist < 2 do continue
-
-        DASH  :: 3
-        GAP   :: 1.2
-        WIDTH :: 0.6
-
-        d := la.normalize(end-start)
-        cursor := start
-        for _ in 0 ..< dist / (DASH+GAP) - 1 {
-            s := cursor
-            e := cursor + d * DASH
-
-            cursor = e + d * GAP
-
-            k2.draw_line(s, e, WIDTH, COLOR_SHADOW)
+        // Enemy company target
+        if hovered, has_hovered := hovered_troop.?; has_hovered {
+            troop := troop_get(hovered)
+            if troop.info.side == side_opposite(comp.side) {
+                draw_target(comp^, troop_get(hovered).info.compi, COLOR_CORPSE)
+            }
+        } // Cell target
+        else if celli, mouse_inside := cell_idx_from_pos(mouse_world); mouse_inside {
+            draw_target(comp^, celli, COLOR_CORPSE)
         }
     }
 }
