@@ -594,12 +594,22 @@ update_hover :: proc () -> (ok: bool) {
     return true
 }
 
-update_click :: proc () -> (ok: bool) {
+selected_set_target :: proc (target: Company_Target) -> (ok: bool) {
 
-    if !k2.mouse_button_went_down(.Left) do return
+    selected := selected_company.? or_return
+    comp := company_get(selected)
 
-    // ignore clicks outside of the grid
-    cell_idx := cell_idx_from_pos(mouse_world) or_return
+    comp.target = target
+    selected_company = nil // disselect after action
+    play_sfx(.Thud_Impact)
+
+    return true
+}
+
+update_mouse_down :: proc () -> (ok: bool) {
+
+    k2.mouse_button_went_down(.Left) or_return
+    celli := cell_idx_from_pos(mouse_world) or_return
 
     if troopi, hovering_troop := hovered_troop.?; hovering_troop {
         // company target
@@ -609,9 +619,7 @@ update_click :: proc () -> (ok: bool) {
 
         switch selected_company {
         case nil:
-            if is_automatic(comp.side) {
-                // cannot select automatic side
-            } else {
+            if !is_automatic(comp.side) {
                 // select
                 selected_company = compi
             }
@@ -627,18 +635,38 @@ update_click :: proc () -> (ok: bool) {
                 selected_company = compi
             } else {
                 // attack opposite side
-                selected_comp.target = compi
-                selected_company = nil // disselect after action
-                play_sfx(.Thud_Impact)
+                selected_set_target(compi)
             }
         }
-    }
-    else if selected, is_selected := selected_company.?; is_selected {
+    } else {
         // cell target
+        selected_set_target(celli)
+    }
 
-        company_get(selected).target = cell_idx
-        selected_company = nil // disselect after action
-        play_sfx(.Thud_Impact)
+    return true
+}
+
+update_mouse_up :: proc () -> (ok: bool) {
+
+    k2.mouse_button_went_up(.Left) or_return
+
+    selected := selected_company.? or_return
+    selected_comp := company_get(selected)
+
+    celli := cell_idx_from_pos(mouse_world) or_return
+
+    if troopi, hovering_troop := hovered_troop.?; hovering_troop {
+        // company target
+
+        troop_comp := troop_company(troopi)
+        if troop_comp.side == selected_comp.side do return
+
+        // attack opposite side
+        selected_set_target(troop_comp.idx)
+    }
+    else {
+        // cell target
+        selected_set_target(celli)
     }
 
     return true
@@ -1328,7 +1356,8 @@ frame :: proc (dt: f32) -> bool {
     if ui_view == .Game {
         update_companies()
         update_hover()
-        update_click()
+        update_mouse_down()
+        update_mouse_up()
         update_automatic()
         update_troops(dt)
         update_arrows(dt)
