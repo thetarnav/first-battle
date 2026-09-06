@@ -593,51 +593,6 @@ update_hover :: proc () -> (ok: bool) {
     return true
 }
 
-update_companies :: proc () -> (ok: bool) {
-
-    // update alive units array and average company position
-    for &comp in companies {
-
-        alive_units := make([dynamic]Troop_Idx, 0, len(comp.units), allocator=context.temp_allocator)
-        sum_pos: Vec2
-
-        for uidx in comp.units {
-            ucell := troop_cell(uidx)
-
-            if troop_is_alive(uidx) {
-                append(&alive_units, uidx)
-                sum_pos += troop_get(uidx).pos
-            } else if ucell.troop == uidx {
-                ucell.troop  = nil
-                ucell.corpse = true
-            }
-        }
-
-        shrink(&alive_units)
-        comp.alive_units = alive_units[:]
-        comp.avg_pos     = sum_pos/f32(len(alive_units))
-    }
-
-    // don't target dead company
-    for &comp in companies {
-        target_idx := comp.target.(Company_Idx) or_continue
-        target_company := company_get(target_idx)
-        if len(target_company.alive_units) == 0 {
-            comp.target = cell_idx_from_pos(comp.avg_pos)
-        }
-    }
-
-    // disselect dead company
-    if selected, is_selected := selected_company.?; is_selected {
-        company := company_get(selected)
-        if len(company.alive_units) == 0 {
-            selected_company = nil
-        }
-    }
-
-    return true
-}
-
 update_click :: proc () -> (ok: bool) {
 
     if !k2.mouse_button_went_down(.Left) do return
@@ -683,6 +638,51 @@ update_click :: proc () -> (ok: bool) {
         company_get(selected).target = cell_idx
         selected_company = nil // disselect after action
         play_sfx(.Thud_Impact)
+    }
+
+    return true
+}
+
+update_companies :: proc () -> (ok: bool) {
+
+    // update alive units array and average company position
+    for &comp in companies {
+
+        alive_units := make([dynamic]Troop_Idx, 0, len(comp.units), allocator=context.temp_allocator)
+        sum_pos: Vec2
+
+        for uidx in comp.units {
+            ucell := troop_cell(uidx)
+
+            if troop_is_alive(uidx) {
+                append(&alive_units, uidx)
+                sum_pos += troop_get(uidx).pos
+            } else if ucell.troop == uidx {
+                ucell.troop  = nil
+                ucell.corpse = true
+            }
+        }
+
+        shrink(&alive_units)
+        comp.alive_units = alive_units[:]
+        comp.avg_pos     = sum_pos/f32(len(alive_units))
+    }
+
+    // don't target dead company
+    for &comp in companies {
+        target_idx := comp.target.(Company_Idx) or_continue
+        target_company := company_get(target_idx)
+        if len(target_company.alive_units) == 0 {
+            comp.target = cell_idx_from_pos(comp.avg_pos)
+        }
+    }
+
+    // disselect dead company
+    if selected, is_selected := selected_company.?; is_selected {
+        company := company_get(selected)
+        if len(company.alive_units) == 0 {
+            selected_company = nil
+        }
     }
 
     return true
