@@ -1322,7 +1322,8 @@ frame :: proc (dt: f32) -> bool {
         game_initalized = false
     }
 
-    if k2.key_went_down(.Escape) { // Esc to main menu
+    if k2.key_went_down(.Escape) ||
+       k2.key_went_down(.Q) { // Esc to main menu
         switch ui_view {
         case .Main_Menu: ui_view = .Game
         case .Game:      ui_view = .Main_Menu
