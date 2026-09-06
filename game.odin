@@ -582,8 +582,11 @@ update_hover :: proc () -> (ok: bool) {
         troopi := cell_get(celli).troop.? or_continue
         if troop_is_dead(troopi) do continue
 
-        hovered_troop = troopi
-        break
+        if selected_company != nil ||
+           !is_automatic(troop_get(troopi).info.side) {
+            hovered_troop = troopi
+            break
+        } 
     }
 
     return true
