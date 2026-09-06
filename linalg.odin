@@ -518,6 +518,10 @@ rect_int_extend :: proc "contextless" (rect: Rect_Int, by: [2]int) -> Rect_Int {
     return {rect.pos - by, rect.size + by*2}
 }
 @require_results
+rect_int_extend_clamp :: proc "contextless" (rect: Rect_Int, by, min, max: [2]int) -> Rect_Int {
+    return {la.max(rect.pos - by, min), la.min(rect.size + by*2, max)}
+}
+@require_results
 rect_int_from_points :: proc "contextless" (points: [][2]int) -> Rect_Int #no_bounds_check {
 
 	if len(points) == 0 do return {}

@@ -1228,9 +1228,8 @@ draw_particles :: proc () {
     }
 }
 
-@(disabled=!ODIN_DEBUG)
 draw_company_targets :: proc () {
-    for comp in companies do if len(comp.alive_units) > 0 {
+    for comp in companies do if len(comp.alive_units) > 0 && !is_automatic(comp.side) {
 
         start := comp.avg_pos
         end   := comp.avg_pos
@@ -1243,10 +1242,22 @@ draw_company_targets :: proc () {
             end = tcomp.avg_pos
         }
 
-        if start == end {
-            draw_cross(start, k2.YELLOW)
-        } else {
-            k2.draw_line(start, end, 0.5, k2.YELLOW)
+        dist := la.distance(start, end)
+        if dist < 2 do continue
+
+        DASH  :: 3
+        GAP   :: 1.2
+        WIDTH :: 0.6
+
+        d := la.normalize(end-start)
+        cursor := start
+        for _ in 0 ..< dist / (DASH+GAP) - 1 {
+            s := cursor
+            e := cursor + d * DASH
+
+            cursor = e + d * GAP
+
+            k2.draw_line(s, e, WIDTH, COLOR_SHADOW)
         }
     }
 }
@@ -1328,11 +1339,11 @@ frame :: proc (dt: f32) -> bool {
 
         draw_board()
         draw_troop_shadows()
+        draw_company_targets()
         draw_corpses()
         draw_troops()
         draw_arrows()
         draw_particles()
-        draw_company_targets()
         draw_selected_company()
 
         k2.set_camera(nil)
