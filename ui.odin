@@ -61,7 +61,7 @@ draw_menu_ui :: proc () {
     play_text_rect.y -= play_text_rect.size.y/2
     play_rect := rect_extend(play_text_rect, {5, 3})
 
-    if point_in_rect(ui_mouse, play_text_rect) && k2.mouse_button_went_down(.Left) {
+    if point_in_rect(ui_mouse, play_text_rect) && mouse_went_down {
         ui_view = .Game
     }
 
@@ -100,7 +100,7 @@ draw_menu_ui :: proc () {
         }
         draw_border(button_rect)
 
-        if point_in_rect(ui_mouse, button_rect) && k2.mouse_button_went_down(.Left) {
+        if point_in_rect(ui_mouse, button_rect) && mouse_went_down {
             automatic[side] = !enabled
         }
 
@@ -115,7 +115,7 @@ draw_menu_ui :: proc () {
         slider_size,
     }
 
-    if point_in_rect(ui_mouse, slider_rect) && k2.mouse_button_went_down(.Left) {
+    if point_in_rect(ui_mouse, slider_rect) && mouse_went_down {
         slider_dragging = true
     }
 
@@ -146,7 +146,7 @@ draw_menu_ui :: proc () {
         }
     }
 
-    if slider_dragging && k2.mouse_button_went_up(.Left) {
+    if slider_dragging && mouse_went_up {
         slider_dragging = false
     }
 
@@ -172,7 +172,7 @@ draw_menu_ui :: proc () {
 
         draw_border(mute_rect)
 
-        if point_in_rect(ui_mouse, mute_rect) && k2.mouse_button_went_down(.Left) {
+        if point_in_rect(ui_mouse, mute_rect) && mouse_went_down {
             audio_toggle_mute()
         }
 
@@ -195,7 +195,7 @@ draw_end_ui :: proc () {
     play_text_rect.y -= play_text_rect.size.y/2
     play_rect := rect_extend(play_text_rect, {5, 3})
 
-    if point_in_rect(ui_mouse, play_text_rect) && k2.mouse_button_went_down(.Left) {
+    if point_in_rect(ui_mouse, play_text_rect) && mouse_went_down {
         ui_view = .Main_Menu
         game_initalized = false
     }

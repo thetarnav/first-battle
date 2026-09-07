@@ -177,15 +177,19 @@ selected_company: Maybe(Company_Idx)
 
 board: grid.Grid(Cell)
 
-// updated every fame
-frame_time:   f64
-window_size:  Vec2
-board_rect:   Rect // board rectangle on the screen
-mouse_pos:    Vec2
-mouse_world:  Vec2
-camera_board: k2.Camera
-
 tex_atlas: k2.Texture
+
+// updated every fame
+frame_time:      f64
+window_size:     Vec2
+board_rect:      Rect // board rectangle on the screen
+camera_board:    k2.Camera
+
+mouse_pos:       Vec2
+mouse_world:     Vec2
+mouse_is_down:   bool
+mouse_went_down: bool
+mouse_went_up:   bool
 
 ARROW_RANGE      :: 58
 ARROW_DAMPING    :: 0.996
@@ -559,12 +563,32 @@ game_init :: proc () {
 }
 
 update_frame_globals :: proc () {
+
     frame_time   = k2.get_time()*1000
     window_size  = k2.get_screen_size()
+
     board_rect   = rect_fit_aspect_max(BOARD_SIZE, window_size, BOARD_RECT_MARGIN)
     camera_board = k2_camera_fit_aspect(BOARD_SIZE, BOARD_RECT_MARGIN)
-    mouse_pos    = k2.get_mouse_position()
-    mouse_world  = k2.screen_to_camera(mouse_pos, camera_board)
+
+    now_is_down: bool
+
+    if touches := k2.get_touches(); len(touches) > 0 {
+        touch := touches[0] // One touch or mouse is enough here
+        now_is_down = (touch.went_down || mouse_is_down) && !touch.went_up
+        mouse_pos   = touch.position
+    } else {
+        now_is_down = k2.mouse_button_is_held(.Left)
+        mouse_pos   = k2.get_mouse_position()
+    }
+
+    mouse_went_down = false
+    mouse_went_up   = false
+
+    if !mouse_is_down &&  now_is_down do mouse_went_down = true
+    if  mouse_is_down && !now_is_down do mouse_went_up   = true
+
+    mouse_is_down = now_is_down
+    mouse_world   = k2.screen_to_camera(mouse_pos, camera_board)
 }
 
 update_hover :: proc () -> (ok: bool) {
@@ -608,7 +632,7 @@ selected_set_target :: proc (target: Company_Target) -> (ok: bool) {
 
 update_mouse_down :: proc () -> (ok: bool) {
 
-    k2.mouse_button_went_down(.Left) or_return
+    if mouse_went_down == false do return
     celli := cell_idx_from_pos(mouse_world) or_return
 
     if troopi, hovering_troop := hovered_troop.?; hovering_troop {
@@ -648,7 +672,7 @@ update_mouse_down :: proc () -> (ok: bool) {
 
 update_mouse_up :: proc () -> (ok: bool) {
 
-    k2.mouse_button_went_up(.Left) or_return
+    if mouse_went_up == false do return
 
     selected := selected_company.? or_return
     selected_comp := company_get(selected)

@@ -15,6 +15,7 @@ init :: proc () {
     k2.init(1280, 720, "My First Battle as a Commanding General", {
         window_mode = .Windowed_Resizable,
     })
+    k2.set_touch_events_from_mouse(false) // Mouse is handled separately in update_frame_globals
     audio_init()
     post_init()
 }
